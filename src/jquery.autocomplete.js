@@ -284,6 +284,12 @@
          * @private
          */
         this.finishOnBlur_ = true;
+        
+        /**
+         * @property {object} current $.ajax request
+         * @private
+         */
+        this.fetchRemoteRequest_ = null;
 
         /**
          * Sanitize options
@@ -594,7 +600,14 @@
                 callback(parsed);
             };
             this.dom.$elem.addClass(this.options.loadingClass);
-            $.ajax({
+            
+            // Cancel previous request
+            if (this.fetchRemoteRequest_) {
+                this.fetchRemoteRequest_.abort();
+                this.fetchRemoteRequest_ = null;
+            }
+            
+            this.fetchRemoteRequest_ = $.ajax({
                 url: this.makeUrl(filter),
                 success: ajaxCallback,
                 error: function(jqXHR, textStatus, errorThrown) {
@@ -603,6 +616,9 @@
                     } else {
                       ajaxCallback(false);
                     }
+                },
+                complete: function() {
+                    self.fetchRemoteRequest_ = null;
                 },
                 dataType: dataType
             });
