@@ -181,17 +181,20 @@
      */
     var plainTextParser = function(text, lineSeparator, cellSeparator) {
         var results = [];
-        var i, j, data, line, value, lines;
-        // Be nice, fix linebreaks before splitting on lineSeparator
-        lines = String(text).replace('\r\n', '\n').split(lineSeparator);
-        for (i = 0; i < lines.length; i++) {
-            line = lines[i].split(cellSeparator);
-            data = [];
-            for (j = 0; j < line.length; j++) {
-                data.push(decodeURIComponent(line[j]));
+        var i, j, data, line, value, lines, returnedText;
+        returnedText = String(text).replace('\r\n', '\n');
+        if (returnedText.length > 0) {
+            // Be nice, fix linebreaks before splitting on lineSeparator
+            lines = returnedText.split(lineSeparator);
+            for (i = 0; i < lines.length; i++) {
+                line = lines[i].split(cellSeparator);
+                data = [];
+                for (j = 0; j < line.length; j++) {
+                    data.push(decodeURIComponent(line[j]));
+                }
+                value = data.shift();
+                results.push({ value: value, data: data });
             }
-            value = data.shift();
-            results.push({ value: value, data: data });
         }
         return results;
     };
