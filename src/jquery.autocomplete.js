@@ -6,6 +6,12 @@
  * @license MIT | GPL | Apache 2.0, see LICENSE.txt
  * @see https://github.com/dyve/jquery-autocomplete
  */
+
+/*
+ISSUES:
+- Start typeing, esc, select all, then esc again (not auto completing)
+- Issues with scrolling
+*/
 (function($) {
     "use strict";
 
@@ -303,10 +309,10 @@
         this.options.maxItemsToShow = sanitizeInteger(this.options.maxItemsToShow, $.fn.autocomplete.defaults.maxItemsToShow, { min: 0 });
         this.options.maxCacheLength = sanitizeInteger(this.options.maxCacheLength, $.fn.autocomplete.defaults.maxCacheLength, { min: 1 });
         this.options.delay = sanitizeInteger(this.options.delay, $.fn.autocomplete.defaults.delay, { min: 0 });
-        if (this.options.preventDefaultReturn != 2) {
+        if (this.options.preventDefaultReturn !== 2) {
             this.options.preventDefaultReturn = this.options.preventDefaultReturn ? 1 : 0;
         }
-        if (this.options.preventDefaultTab != 2) {
+        if (this.options.preventDefaultTab !== 2) {
             this.options.preventDefaultTab = this.options.preventDefaultTab ? 1 : 0;
         }
 
@@ -332,7 +338,7 @@
         // Clone input element
         this.dom.$acelem = this.dom.$elem.clone().attr({ 'id':'', 'disabled' : 'disabled' }).addClass(this.options.inputAcClass);        
         // Wrap div around input
-        this.dom.$elem.wrap($('<div><div></div></div>').addClass(this.options.inputWrapper));        
+        this.dom.$elem.wrap($('<div><div style="position: relative;"></div></div>').addClass(this.options.inputWrapper));        
         // Get wrapper
         this.dom.$box = this.dom.$elem.parent().parent();        
         // Append autocomplete input
@@ -1086,11 +1092,11 @@
         var extraCaretPos = 0;
         if ( this.options.useDelimiter ) {
             // if there is a preceding delimiter, add a space after the delimiter
-            if ( elem.val().substring(d.start-1, d.start) == delimiter && delimiter != ' ' ) {
+            if ( elem.val().substring(d.start-1, d.start) === delimiter && delimiter !== ' ' ) {
                 displayValue = ' ' + displayValue;
             }
             // if there is not already a delimiter trailing this value, add it
-            if ( elem.val().substring(d.end, d.end+1) != delimiter && this.lastKeyPressed_ != this.options.delimiterKeyCode ) {
+            if ( elem.val().substring(d.end, d.end+1) !== delimiter && this.lastKeyPressed_ !== this.options.delimiterKeyCode ) {
                 displayValue = displayValue + delimiter;
             } else {
                 // move the cursor after the existing trailing delimiter
@@ -1178,16 +1184,17 @@
         if (!$.support.cssFloat) {
             // ie
             var selection = document.selection;
-            if (elem[0].tagName.toLowerCase() != 'textarea') {
+            var range;
+            if (elem[0].tagName.toLowerCase() !== 'textarea') {
                 var val = elem.val();
-                var range = selection.createRange().duplicate();
+                range = selection.createRange().duplicate();
                 range.moveEnd('character', val.length);
-                s = ( range.text == '' ? val.length : val.lastIndexOf(range.text) );
+                s = ( range.text === '' ? val.length : val.lastIndexOf(range.text) );
                 range = selection.createRange().duplicate();
                 range.moveStart('character', -val.length);
                 e = range.text.length;
             } else {
-                var range = selection.createRange();
+                range = selection.createRange();
                 var stored_range = range.duplicate();
                 stored_range.moveToElementText(elem[0]);
                 stored_range.setEndPoint('EndToEnd', range);
@@ -1256,13 +1263,15 @@
      * Get the offsets of the value currently being autocompleted
      */
     $.Autocompleter.prototype.getDelimiterOffsets = function() {
-        var val = this.dom.$elem.val();
+        var val = this.dom.$elem.val(),
+            start,
+            end;
         if ( this.options.useDelimiter ) {
             var preCaretVal = val.substring(0, this.getCaret().start);
-            var start = preCaretVal.lastIndexOf(this.options.delimiterChar) + 1;
+            start = preCaretVal.lastIndexOf(this.options.delimiterChar) + 1;
             var postCaretVal = val.substring(this.getCaret().start);
-            var end = postCaretVal.indexOf(this.options.delimiterChar);
-            if ( end == -1 ) end = val.length;
+            end = postCaretVal.indexOf(this.options.delimiterChar);
+            if ( end === -1 ) end = val.length;
             end += this.getCaret().start;
         } else {
             start = 0;
