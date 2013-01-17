@@ -40,6 +40,8 @@
      */
     $.fn.autocomplete.defaults = {
         inputClass: 'acInput',
+        inputAcClass: 'acInput-back',
+        inputWrapper: 'acWrapper',
         loadingClass: 'acLoading',
         resultsClass: 'acResults',
         selectClass: 'acSelect',
@@ -77,7 +79,7 @@
         delimiterChar: ',',
         delimiterKeyCode: 188,
         processData: null,
-        onError: null
+        onError: null        
     };
 
     /**
@@ -273,7 +275,7 @@
          * @property {string} Last value selected by the user
          * @private
          */
-        this.lastSelectedValue_ = null;
+        this.lastSelectedValue_ = null; 
 
         /**
          * @property {boolean} Is this autocompleter active (showing results)?
@@ -322,6 +324,32 @@
          * Switch off the native autocomplete and add the input class
          */
         this.dom.$elem.attr('autocomplete', 'off').addClass(this.options.inputClass);
+        
+        /**
+         * Replace input field with DIV and autocomplete backing field
+         */
+
+        // Clone input element
+        this.dom.$acelem = this.dom.$elem.clone().attr({ 'id':'', 'disabled' : 'disabled' }).addClass(this.options.inputAcClass);        
+        // Wrap div around input
+        this.dom.$elem.wrap($('<div></div>').addClass(this.options.inputWrapper));        
+        // Get wrapper
+        this.dom.$box = this.dom.$elem.parent();        
+        // Append autocomplete input
+        this.dom.$box.append(this.dom.$acelem);
+        
+        /**
+         * Attach Click Monitoring to Wrapper
+         */
+        this.dom.$box.click(function (event) {
+            self.dom.$elem.focus();
+        });
+
+        // Make sure we don't call box.click when input field was clicked
+        this.dom.$elem.click(function (event) {
+            event.stopPropagation();
+        });
+
 
         /**
          * Create DOM element to hold results, and force absolute position
@@ -330,6 +358,9 @@
             position: 'absolute'
         });
         $('body').append(this.dom.$results);
+
+        this.dom.$list = $('<ul></ul>');
+        this.dom.$results.append(this.dom.$list);
 
         /**
          * Attach keyboard monitoring to $elem
@@ -418,9 +449,20 @@
          * Finish on blur event
          * Use a timeout because instant blur gives race conditions
          */
-        var onBlurFunction = function() {
-            self.deactivate(true);
-        }
+        var onBlurFunction = function(e) {
+            console.log("onBlurFunction");
+            if (!self.isScrolling_) {
+                if (self.active_) {
+                    self.selectCurrent(true);
+                }
+                self.deactivate(true);
+            } else {
+                setTimeout(function () {
+                    $elem.focus();
+                }, 1);
+            }
+        };
+        
         $elem.blur(function() {
             if (self.finishOnBlur_) {
                 self.finishTimeout_ = setTimeout(onBlurFunction, 200);
@@ -431,6 +473,47 @@
          */
         $elem.parents('form').on('submit', onBlurFunction);
 
+        var onFocusFunction = function () {
+            var len = self.getValue().length;
+            
+            if (len > 0) {
+                self.dom.$elem.select();
+                self.lastSelectedValue_ = self.getValue();
+                // Chrome workaround: http://stackoverflow.com/questions/3380458/looking-for-a-better-workaround-to-chrome-select-on-focus-bug
+                $elem.mouseup(function(e) {
+                    e.preventDefault();
+                    $(this).unbind("mouseup");
+                });
+            }
+        };
+
+        $elem.on('focus', function () {
+            if (!self.isScrolling_) {
+                onFocusFunction();
+            } else {
+                // Set to previous position
+                self.setCaret(self.caretPosition_.start);
+                
+                // Reset scrolling
+                self.isScrolling_ = false;
+                self.caretPosition_ = null;
+            }
+        });
+
+        this.dom.$list.on('scroll', function () {
+            // Save current position
+            self.isScrolling_ = true;
+            self.caretPosition_ = self.getCaret();
+            
+            
+            if ($(this).scrollTop() + $(this).innerHeight() >= $(this)[0].scrollHeight) {
+                console.log("end of scroll");
+            }
+                
+
+            //if ($(this)[0].scrollHeight - $(this).scrollTop() == $(this).outerHeight()) ;
+            // what you want to do ...
+        });
     };
 
     /**
@@ -438,10 +521,10 @@
      * @private
      */
     $.Autocompleter.prototype.position = function() {
-        var offset = this.dom.$elem.offset();
+        var offset = this.dom.$box.offset();
         var height = this.dom.$results.outerHeight();
         var totalHeight = $(window).outerHeight();
-        var inputBottom = offset.top + this.dom.$elem.outerHeight();
+        var inputBottom = offset.top + this.dom.$box.outerHeight();
         var bottomIfDown = inputBottom + height;
         // Set autocomplete results at the bottom of input
         var position = {top: inputBottom, left: offset.left};
@@ -550,7 +633,7 @@
      */
     $.Autocompleter.prototype.activateNow = function() {
         var value = this.beforeUseConverter(this.dom.$elem.val());
-        if (value !== this.lastProcessedValue_ && value !== this.lastSelectedValue_) {
+        if ((value !== this.lastProcessedValue_ && value !== this.lastSelectedValue_) || (this.lastKeyPressed_ === 46 || this.lastKeyPressed_ === 8)) {
             this.fetchData(value);
         }
     };
@@ -586,7 +669,7 @@
      * @param {function} callback The function to call after data retrieval
      * @private
      */
-    $.Autocompleter.prototype.fetchRemoteData = function(filter, callback) {
+    $.Autocompleter.prototype.fetchRemoteData = function (filter, callback) {
         var data = this.cacheRead(filter);
         if (data) {
             callback(data);
@@ -859,14 +942,14 @@
     $.Autocompleter.prototype.showResults = function(results, filter) {
         var numResults = results.length;
         var self = this;
-        var $ul = $('<ul></ul>');
+        this.dom.$list.empty();
         var i, result, $li, autoWidth, first = false, $first = false;
 
         if (numResults) {
             for (i = 0; i < numResults; i++) {
                 result = results[i];
                 $li = this.createItemFromResult(result);
-                $ul.append($li);
+                this.dom.$list.append($li);
                 if (first === false) {
                     first = String(result.value);
                     $first = $li;
@@ -877,14 +960,15 @@
                 }
             }
 
-            this.dom.$results.html($ul).show();
+            this.dom.$results.show();
 
             // Always recalculate position since window size or
             // input element location may have changed.
             this.position();
             if (this.options.autoWidth) {
-                autoWidth = this.dom.$elem.outerWidth() - this.dom.$results.outerWidth() + this.dom.$results.width();
+                autoWidth = this.dom.$box.outerWidth() - this.dom.$results.outerWidth() + this.dom.$results.width();
                 this.dom.$results.css(this.options.autoWidth, autoWidth);
+                $('>ul', this.dom.$results).css(this.options.autoWidth, autoWidth); // AR - IE7 - set correct width on the list too otherwise scrollbar is in the middle of div
             }
             this.getItems().hover(
                 function() { self.focusItem(this); },
@@ -897,6 +981,7 @@
         } else {
             this.hideResults();
             this.active_ = false;
+            this.setAcValue('');
         }
     };
 
@@ -908,21 +993,21 @@
         }
     };
 
-    $.Autocompleter.prototype.autoFill = function(value, filter) {
+    $.Autocompleter.prototype.autoFill = function (value, filter) {
         var lcValue, lcFilter, valueLength, filterLength;
-        if (this.options.autoFill && this.lastKeyPressed_ !== 8) {
+        
+       if (this.options.autoFill) {
             lcValue = String(value).toLowerCase();
             lcFilter = String(filter).toLowerCase();
-            valueLength = value.length;
             filterLength = filter.length;
             if (lcValue.substr(0, filterLength) === lcFilter) {
-                var d = this.getDelimiterOffsets();
-                var pad = d.start ? ' ' : ''; // if there is a preceding delimiter
-                this.setValue( pad + value );
-                var start = filterLength + d.start + pad.length;
-                var end = valueLength + d.start + pad.length;
-                this.selectRange(start, end);
+                // NOTE: Delimiter is not handled)
+                this.setValue(value.substr(0, filterLength));
+                this.setAcValue(value);
+                //this.selectRange(start, end);
                 return true;
+            } else {
+                this.setAcValue(value);
             }
         }
         return false;
@@ -970,16 +1055,16 @@
         }
     };
 
-    $.Autocompleter.prototype.selectCurrent = function() {
+    $.Autocompleter.prototype.selectCurrent = function(skipFocus) {
         var $item = $('li.' + this.selectClass_, this.dom.$results);
         if ($item.length === 1) {
-            this.selectItem($item);
+            this.selectItem($item, skipFocus);
         } else {
             this.deactivate(false);
         }
     };
 
-    $.Autocompleter.prototype.selectItem = function($li) {
+    $.Autocompleter.prototype.selectItem = function ($li, skipFocus) {        
         var value = $li.data('value');
         var data = $li.data('data');
         var displayValue = this.displayValue(value, data);
@@ -1004,10 +1089,11 @@
             }
         }
         this.setValue(displayValue);
+        this.setAcValue("");
         this.setCaret(d.start + displayValue.length + extraCaretPos);
         this.callHook('onItemSelect', { value: value, data: data });
         this.deactivate(true);
-        elem.focus();    
+        if (!skipFocus) elem.focus();    
     };
 
     $.Autocompleter.prototype.displayValue = function(value, data) {
@@ -1027,22 +1113,27 @@
         }
         if (this.keyTimeout_) {
             clearTimeout(this.keyTimeout_);
-        }
-        if (finish) {
+        }        
+        if (finish) {            
             if (this.lastProcessedValue_ !== this.lastSelectedValue_) {
                 if (this.options.mustMatch) {
-                    this.setValue('');
+                    if (this.lastSelectedValue_.length > 0) {
+                        this.setValue(this.lastSelectedValue_);
+                    } else {
+                        this.setValue('');
+                    }
                 }
                 this.callHook('onNoMatch');
             }
             if (this.active_) {
                 this.callHook('onFinish');
-            }
+            }            
             this.lastKeyPressed_ = null;
             this.lastProcessedValue_ = null;
             this.lastSelectedValue_ = null;
             this.active_ = false;
         }
+        this.setAcValue('');
         this.hideResults();
     };
 
@@ -1073,29 +1164,30 @@
      */
     $.Autocompleter.prototype.getCaret = function() {
         var elem = this.dom.$elem;
-        if ($.browser.msie) {
+        var s, e;
+        if (!$.support.cssFloat) {
             // ie
             var selection = document.selection;
             if (elem[0].tagName.toLowerCase() != 'textarea') {
                 var val = elem.val();
                 var range = selection.createRange().duplicate();
                 range.moveEnd('character', val.length);
-                var s = ( range.text == '' ? val.length : val.lastIndexOf(range.text) );
+                s = ( range.text == '' ? val.length : val.lastIndexOf(range.text) );
                 range = selection.createRange().duplicate();
                 range.moveStart('character', -val.length);
-                var e = range.text.length;
+                e = range.text.length;
             } else {
                 var range = selection.createRange();
                 var stored_range = range.duplicate();
                 stored_range.moveToElementText(elem[0]);
                 stored_range.setEndPoint('EndToEnd', range);
-                var s = stored_range.text.length - range.text.length;
-                var e = s + range.text.length;
+                s = stored_range.text.length - range.text.length;
+                e = s + range.text.length;
             }
         } else {
             // ff, chrome, safari
-            var s = elem[0].selectionStart;
-            var e = elem[0].selectionEnd;
+            s = elem[0].selectionStart;
+            e = elem[0].selectionEnd;
         }
         return {
             start: s,
@@ -1117,6 +1209,23 @@
             value = preVal + value + postVal;
         }
         this.dom.$elem.val(value);
+    };
+    
+    /**
+     * Set the autocomplete value that is currently being autocompleted
+     * @param {String} value
+     */
+    $.Autocompleter.prototype.setAcValue = function (value) {
+        // NOTE: delimiter is not handled
+        if (this.options.useDelimiter) {
+            // set the substring between the current delimiters
+            var val = this.dom.$elem.val();
+            var d = this.getDelimiterOffsets();
+            var preVal = val.substring(0, d.start);
+            var postVal = val.substring(d.end);
+            value = preVal + value + postVal;
+        }
+        this.dom.$acelem.val(value);
     };
 
     /**

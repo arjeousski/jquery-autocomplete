@@ -4,18 +4,57 @@
  * @license MIT | GPL | Apache 2.0, see LICENSE.txt
  * @see https://github.com/dyve/jquery-autocomplete
  */
+
+.acWrapper {
+    position: relative;  
+    display: block;
+    height: 1em;
+    padding: 5px;            
+    border: 1px solid silver;
+    cursor: text;
+    background-color: white; 
+    vertical-align: middle;
+    width: 200px;
+}
+
+.acInput {
+
+    margin: 0px;
+    padding: 0px;
+    outline: none;
+    border: 0px;
+
+    color: #000;
+    background-color: transparent;
+    z-index: 10;
+    position:absolute;
+    width: 100%;
+    height: auto;
+}
+
+.acInput-back {
+    color: #CCC;
+    position:absolute;
+    z-index: 1;
+}
+
 .acResults {
 	padding: 0px;
 	border: 1px solid WindowFrame;
 	background-color: Window;
-	overflow: hidden;
 }
 
 .acResults ul {
 	margin: 0px;
 	padding: 0px;
 	list-style-position: outside;
-	list-style: none;	
+	list-style: none;
+    display: block;
+    
+    /* Allow list to be scrollable 	*/
+    max-height: 20em;
+    overflow: auto;    
+    overflow-x: hidden;
 }
 
 .acResults ul li {
