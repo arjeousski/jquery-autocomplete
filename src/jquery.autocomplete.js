@@ -332,11 +332,11 @@
         // Clone input element
         this.dom.$acelem = this.dom.$elem.clone().attr({ 'id':'', 'disabled' : 'disabled' }).addClass(this.options.inputAcClass);        
         // Wrap div around input
-        this.dom.$elem.wrap($('<div></div>').addClass(this.options.inputWrapper));        
+        this.dom.$elem.wrap($('<div><div></div></div>').addClass(this.options.inputWrapper));        
         // Get wrapper
-        this.dom.$box = this.dom.$elem.parent();        
+        this.dom.$box = this.dom.$elem.parent().parent();        
         // Append autocomplete input
-        this.dom.$box.append(this.dom.$acelem);
+        this.dom.$elem.parent().append(this.dom.$acelem);
         
         /**
          * Attach Click Monitoring to Wrapper
@@ -367,6 +367,7 @@
          */
         $elem.keydown(function(e) {
             self.lastKeyPressed_ = e.keyCode;
+            console.log("Key Pressed:", self.lastKeyPressed_);
             switch(self.lastKeyPressed_) {
 
                 case self.options.delimiterKeyCode: // comma = 188
@@ -446,7 +447,7 @@
         });
 
         /**
-         * Finish on blur event
+         * Events functions
          * Use a timeout because instant blur gives race conditions
          */
         var onBlurFunction = function(e) {
@@ -463,30 +464,40 @@
             }
         };
         
-        $elem.blur(function() {
-            if (self.finishOnBlur_) {
-                self.finishTimeout_ = setTimeout(onBlurFunction, 200);
-            }
-        });
-        /**
-         * Catch a race condition on form submit
-         */
-        $elem.parents('form').on('submit', onBlurFunction);
-
         var onFocusFunction = function () {
+            console.log("onFocusIn", self.lastSelectedValue_, self.active_);
             var len = self.getValue().length;
-            
+
             if (len > 0) {
                 self.dom.$elem.select();
                 self.lastSelectedValue_ = self.getValue();
                 // Chrome workaround: http://stackoverflow.com/questions/3380458/looking-for-a-better-workaround-to-chrome-select-on-focus-bug
-                $elem.mouseup(function(e) {
+                $elem.mouseup(function (e) {
                     e.preventDefault();
                     $(this).unbind("mouseup");
                 });
             }
         };
 
+        var onScrollFunction = function() {
+            // Save current position
+            self.isScrolling_ = true;
+            self.caretPosition_ = self.getCaret();
+
+            console.log($(this)[0].scrollHeight, $(this).scrollTop(), $(this).outerHeight());
+
+            if ($(this).scrollTop() + $(this).innerHeight() >= $(this)[0].scrollHeight) {
+                console.log("end of scroll");
+            }
+        };
+        
+        
+        $elem.blur(function() {
+            if (self.finishOnBlur_) {
+                self.finishTimeout_ = setTimeout(onBlurFunction, 200);
+            }
+        });
+        
         $elem.on('focus', function () {
             if (!self.isScrolling_) {
                 onFocusFunction();
@@ -500,20 +511,14 @@
             }
         });
 
-        this.dom.$list.on('scroll', function () {
-            // Save current position
-            self.isScrolling_ = true;
-            self.caretPosition_ = self.getCaret();
-            
-            
-            if ($(this).scrollTop() + $(this).innerHeight() >= $(this)[0].scrollHeight) {
-                console.log("end of scroll");
-            }
-                
+        this.dom.$list.on('scroll', onScrollFunction);
+        
 
-            //if ($(this)[0].scrollHeight - $(this).scrollTop() == $(this).outerHeight()) ;
-            // what you want to do ...
-        });
+        /**
+         * Catch a race condition on form submit
+         */
+        $elem.parents('form').on('submit', onBlurFunction);
+
     };
 
     /**
@@ -633,6 +638,7 @@
      */
     $.Autocompleter.prototype.activateNow = function() {
         var value = this.beforeUseConverter(this.dom.$elem.val());
+        console.log("activateNow", value, this.lastProcessedValue_, this.lastSelectedValue_);
         if ((value !== this.lastProcessedValue_ && value !== this.lastSelectedValue_) || (this.lastKeyPressed_ === 46 || this.lastKeyPressed_ === 8)) {
             this.fetchData(value);
         }
@@ -670,6 +676,7 @@
      * @private
      */
     $.Autocompleter.prototype.fetchRemoteData = function (filter, callback) {
+        console.log("fetchRemoteData", filter);
         var data = this.cacheRead(filter);
         if (data) {
             callback(data);
@@ -994,6 +1001,7 @@
     };
 
     $.Autocompleter.prototype.autoFill = function (value, filter) {
+        console.log("autofill", value, filter);
         var lcValue, lcFilter, valueLength, filterLength;
         
        if (this.options.autoFill) {
@@ -1067,6 +1075,7 @@
     $.Autocompleter.prototype.selectItem = function ($li, skipFocus) {        
         var value = $li.data('value');
         var data = $li.data('data');
+        console.log("selectItem", value);
         var displayValue = this.displayValue(value, data);
         var processedDisplayValue = this.beforeUseConverter(displayValue);
         this.lastProcessedValue_ = processedDisplayValue;
@@ -1108,6 +1117,7 @@
     };
 
     $.Autocompleter.prototype.deactivate = function(finish) {
+        console.log("deactivate", this.lastProcessedValue_, this.lastSelectedValue_);
         if (this.finishTimeout_) {
             clearTimeout(this.finishTimeout_);
         }
