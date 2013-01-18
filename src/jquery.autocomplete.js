@@ -341,23 +341,17 @@ ISSUES:
         // Clone input element
         this.dom.$acelem = this.dom.$elem.clone().attr({ 'id':'', 'disabled' : 'disabled' }).addClass(this.options.inputAcClass);        
         // Wrap div around input
-        this.dom.$elem.wrap($('<div><div style="position: relative;"></div></div>').addClass(this.options.inputWrapper));        
+        this.dom.$elem.wrap($('<div><div class="inputWrap"></div></div>').addClass(this.options.inputWrapper));
         // Get wrapper
-        this.dom.$box = this.dom.$elem.parent().parent();        
+        this.dom.$box = this.dom.$elem.parent().parent();
+
+        // Append Arrow
+        this.dom.$arrow = $('<div class="arrow"></div>');
+        this.dom.$box.append(this.dom.$arrow);
+        
         // Append autocomplete input
         this.dom.$elem.parent().append(this.dom.$acelem);
-        
-        /**
-         * Attach Click Monitoring to Wrapper
-         */
-        this.dom.$box.click(function (event) {
-            self.dom.$elem.focus();
-        });
-
-        // Make sure we don't call box.click when input field was clicked
-        this.dom.$elem.click(function (event) {
-            event.stopPropagation();
-        });
+      
 
 
         /**
@@ -478,22 +472,26 @@ ISSUES:
          */
         var onBlurFunction = function(e) {
             console.log("onBlurFunction");
-            if (!self.isMouseDownInAutocomplete_) {
-                if (self.active_) {
-                    self.selectCurrent(true);
-                }
-                self.deactivate(true);
-            } else {
+            if (self.isMouseDownInAutocomplete_) {
                 setTimeout(function () {
                     $elem.focus();
-                    self.isMouseDownInAutocomplete_ = false;
                     
                     // Set to previous position
                     self.setCaret(self.caretPosition_.start);
                     self.caretPosition_ = null;
                 }, 1);
+            } else {
+                if (!self.isClickOnArrow_) {
+                    if (self.active_) {
+                        self.selectCurrent(true);
+                    } else {
+                        self.deactivate(true);
+                    }
+                }
             }
-            
+            // Reset all flags
+            self.isClickOnArrow_ = false;
+            self.isMouseDownInAutocomplete_ = false;
         };
         
         // Selects all text in the textbox
@@ -521,13 +519,14 @@ ISSUES:
             }
         };
         
-        
+        // BLUR event on input element
         $elem.on('blur',function() {
             if (self.finishOnBlur_) {
                 self.finishTimeout_ = setTimeout(onBlurFunction, 200);
             }
         });
         
+        // FOCUS event on input element
         $elem.on('focus', function () {
             // Only trigger this if focus isn't coming from autocomplete box
             if (!self.isMouseDownInAutocomplete_) {
@@ -535,11 +534,39 @@ ISSUES:
             }
         });
 
+        // SCROLL event on LIST
         this.dom.$list.on('scroll', onScrollFunction);
 
+        // MOUSEDOWN on LIST
         this.dom.$list.on('mousedown',function() {
             self.isMouseDownInAutocomplete_ = true;
             self.caretPosition_ = self.getCaret();
+        });
+        
+        this.dom.$box.click(function (event) {
+            console.log("box.click");
+            self.dom.$elem.focus();
+        });
+
+        // Make sure we don't call box.click when input field was clicked
+        this.dom.$elem.click(function (event) {
+            console.log("input.click");
+            event.stopPropagation();
+        });
+
+        // Attach click event for arrow
+        this.dom.$arrow.click(function (event) {
+            self.isClickOnArrow_ = true;
+            // Same event as down arrow on keyboard
+            if (!self.active_) {
+                console.log("arrow click");
+                self.activate();
+                self.focusNext();
+                self.dom.$elem.focus();
+                console.log("arrow click done");
+            }
+            event.preventDefault();
+            return false;
         });
         
 
@@ -991,8 +1018,11 @@ ISSUES:
      * Get all items from the results list
      * @param result
      */
-    $.Autocompleter.prototype.getItems = function() {
-        return $('>ul>li', this.dom.$results);
+    $.Autocompleter.prototype.getItems = function () {
+        if (!this.$itemsCache_) {
+            this.$itemsCache_ = $('>ul>li', this.dom.$results);
+        }
+        return this.$itemsCache_;        
     };
 
     /**
@@ -1003,9 +1033,13 @@ ISSUES:
     $.Autocompleter.prototype.showResults = function(results, filter, append) {
         var numResults = results.length;
         var self = this;
+        
+        // reset items cache
+        this.$itemsCache_ = null;
+
         if (!append) {
-            this.dom.$list.scrollTop(0);
             this.dom.$list.empty();
+            this.dom.$list.scrollTop(0);
         }
         var i, result, $li, autoWidth, first = false, $first = false;
 
@@ -1032,7 +1066,6 @@ ISSUES:
             // grab height of one item
             if (!self.itemHeight_) {
                 self.itemHeight_ = $first.outerHeight();
-                console.log("itemHeight_", self.itemHeight_);
             }
 
             // Always recalculate position since window size or
@@ -1045,6 +1078,8 @@ ISSUES:
                 $('>ul', this.dom.$results).css(this.options.autoWidth, autoWidth); // AR - IE7 - set correct width on the list too otherwise scrollbar is in the middle of div
             }
             var items = this.getItems();
+            
+            // unbind events from existing items
             if (append) {
                 items.unbind('mouseenter mouseleave');
             }
@@ -1075,8 +1110,7 @@ ISSUES:
     };
 
     $.Autocompleter.prototype.autoFill = function (value, filter) {
-        console.log("autofill", value, filter);
-        var lcValue, lcFilter, valueLength, filterLength;
+        var lcValue, lcFilter, filterLength;
         
        if (this.options.autoFill) {
             lcValue = String(value).toLowerCase();
@@ -1084,7 +1118,8 @@ ISSUES:
             filterLength = filter.length;
             if (lcValue.substr(0, filterLength) === lcFilter) {
                 // NOTE: Delimiter is not handled)
-                this.setValue(value.substr(0, filterLength));
+                this.lastProcessedValue_ = value.substr(0, filterLength);
+                this.setValue(this.lastProcessedValue_);                
                 this.setAcValue(value);
                 //this.selectRange(start, end);
                 return true;
@@ -1125,10 +1160,11 @@ ISSUES:
         this.focusItem(0);
     };
 
-    $.Autocompleter.prototype.focusItem = function(item) {
-        var $item, $items = this.getItems();
+    $.Autocompleter.prototype.focusItem = function (item) {
+        console.log("focusItem");
+        var $item, $items = this.getItems(), $selectedItems = $items.filter("." + this.selectClass_);
         if ($items.length) {
-            $items.removeClass(this.selectClass_).removeClass(this.options.selectClass);
+            $selectedItems.removeClass(this.selectClass_).removeClass(this.options.selectClass);
             if (typeof item === 'number') {
                 if (item < 0) {
                     item = 0;
@@ -1140,8 +1176,17 @@ ISSUES:
                 $item = $(item);
             }
             if ($item) {
+                
                 $item.addClass(this.selectClass_).addClass(this.options.selectClass);
                 this.scrollItemIntoView($item);
+                var value = $item.data('value');
+                if (value.substr(0, this.lastProcessedValue_.length) !== this.lastProcessedValue_) {
+                    this.setValue('');
+                    this.setAcValue(value);
+                } else {
+                    this.setValue(this.lastProcessedValue_);
+                    this.setAcValue(value);                    
+                }
             }
         }
     };
@@ -1151,7 +1196,6 @@ ISSUES:
      * @param {Number} pos
      */
     $.Autocompleter.prototype.scrollItemIntoView = function ($item) {
-        console.log("scrollItemIntoView");
         var itemHeight = $item.outerHeight(),
 			dropdown = this.dom.$list,
 			dropdownHeight = dropdown.innerHeight(),
@@ -1160,8 +1204,6 @@ ISSUES:
 			scrollTo = null,
 			paddingTop = parseInt(dropdown.css('paddingTop'))
         ;
-
-        console.log(itemHeight, dropdownHeight, scrollPos, itemTop, paddingTop);
 
         if (itemTop == null)
             return;
@@ -1190,7 +1232,7 @@ ISSUES:
     $.Autocompleter.prototype.selectItem = function ($li, skipFocus) {        
         var value = $li.data('value');
         var data = $li.data('data');
-        console.log("selectItem", value);
+        console.log("selectItem", value, skipFocus);
         var displayValue = this.displayValue(value, data);
         var processedDisplayValue = this.beforeUseConverter(displayValue);
         this.lastProcessedValue_ = processedDisplayValue;
@@ -1213,11 +1255,13 @@ ISSUES:
             }
         }
         this.setValue(displayValue);
-        this.setAcValue("");
-        this.setCaret(d.start + displayValue.length + extraCaretPos);
+        this.setAcValue("");       
         this.callHook('onItemSelect', { value: value, data: data });
         this.deactivate(true);
-        if (!skipFocus) elem.focus();    
+        if (!skipFocus) {
+            this.setCaret(d.start + displayValue.length + extraCaretPos);
+            elem.focus();
+        }
     };
 
     $.Autocompleter.prototype.displayValue = function(value, data) {
@@ -1232,7 +1276,7 @@ ISSUES:
     };
 
     $.Autocompleter.prototype.deactivate = function(finish) {
-        console.log("deactivate", this.lastProcessedValue_, this.lastSelectedValue_);
+        console.log("deactivate", finish, this.lastProcessedValue_, this.lastSelectedValue_);
         if (this.finishTimeout_) {
             clearTimeout(this.finishTimeout_);
         }
