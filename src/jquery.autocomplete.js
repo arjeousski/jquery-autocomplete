@@ -85,7 +85,10 @@ ISSUES:
         delimiterChar: ',',
         delimiterKeyCode: 188,
         processData: null,
-        onError: null        
+        onError: null,
+        limitParam: null,
+        skipParam: null,
+        numLoadInitial: 0
     };
 
     /**
@@ -458,7 +461,7 @@ ISSUES:
          */
         var onBlurFunction = function(e) {
             console.log("onBlurFunction");
-            if (!self.isScrolling_) {
+            if (!self.isMouseDownInAutocomplete_) {
                 if (self.active_) {
                     self.selectCurrent(true);
                 }
@@ -466,19 +469,24 @@ ISSUES:
             } else {
                 setTimeout(function () {
                     $elem.focus();
+                    self.isMouseDownInAutocomplete_ = false;
+                    
+                    // Set to previous position
+                    self.setCaret(self.caretPosition_.start);
+                    self.caretPosition_ = null;
                 }, 1);
             }
+            
         };
         
-        var onFocusFunction = function () {
-            console.log("onFocusIn", self.lastSelectedValue_, self.active_);
+        // Selects all text in the textbox
+        var selectAllText = function () {
             var len = self.getValue().length;
-
             if (len > 0) {
                 self.dom.$elem.select();
                 self.lastSelectedValue_ = self.getValue();
                 // Chrome workaround: http://stackoverflow.com/questions/3380458/looking-for-a-better-workaround-to-chrome-select-on-focus-bug
-                $elem.mouseup(function (e) {
+                $elem.on('mouseup',function (e) {
                     e.preventDefault();
                     $(this).unbind("mouseup");
                 });
@@ -486,38 +494,36 @@ ISSUES:
         };
 
         var onScrollFunction = function() {
-            // Save current position
-            self.isScrolling_ = true;
-            self.caretPosition_ = self.getCaret();
+            var $this = $(this);
+            if ($this[0].scrollHeight > $this.innerHeight() && $this.scrollTop() + $this.innerHeight() >= $this[0].scrollHeight) {
 
-            console.log($(this)[0].scrollHeight, $(this).scrollTop(), $(this).outerHeight());
-
-            if ($(this).scrollTop() + $(this).innerHeight() >= $(this)[0].scrollHeight) {
-                console.log("end of scroll");
+                if (self.lastAllDataLoadedValue_ !== self.lastProcessedValue_) {
+                    self.fetchData(self.lastProcessedValue_, true);
+                    self.lastAllDataLoadedValue_ = self.lastProcessedValue_;
+                }
             }
         };
         
         
-        $elem.blur(function() {
+        $elem.on('blur',function() {
             if (self.finishOnBlur_) {
                 self.finishTimeout_ = setTimeout(onBlurFunction, 200);
             }
         });
         
         $elem.on('focus', function () {
-            if (!self.isScrolling_) {
-                onFocusFunction();
-            } else {
-                // Set to previous position
-                self.setCaret(self.caretPosition_.start);
-                
-                // Reset scrolling
-                self.isScrolling_ = false;
-                self.caretPosition_ = null;
+            // Only trigger this if focus isn't coming from autocomplete box
+            if (!self.isMouseDownInAutocomplete_) {
+                selectAllText();
             }
         });
 
         this.dom.$list.on('scroll', onScrollFunction);
+
+        this.dom.$list.on('mousedown',function() {
+            self.isMouseDownInAutocomplete_ = true;
+            self.caretPosition_ = self.getCaret();
+        });
         
 
         /**
@@ -655,22 +661,25 @@ ISSUES:
      * @param {string} value Value to base autocompletion on
      * @private
      */
-    $.Autocompleter.prototype.fetchData = function(value) {
+    $.Autocompleter.prototype.fetchData = function(value, fetchRemaining) {
         var self = this;
-        var processResults = function(results, filter) {
+        var processResults = function(results, filter, append) {
             if (self.options.processData) {
                 results = self.options.processData(results);
             }
-            self.showResults(self.filterResults(results, filter), filter);
+            self.showResults(self.filterResults(results, filter), filter, append);
         };
-        this.lastProcessedValue_ = value;
+        if (!fetchRemaining) {
+            this.lastProcessedValue_ = value;
+            this.lastAllDataLoadedValue_ = null;
+        }
         if (value.length < this.options.minChars) {
             processResults([], value);
         } else if (this.options.data) {
             processResults(this.options.data, value);
         } else {
-            this.fetchRemoteData(value, function(remoteData) {
-                processResults(remoteData, value);
+            this.fetchRemoteData(value, fetchRemaining, function (remoteData, append) {
+                processResults(remoteData, value, append);
             });
         }
     };
@@ -681,8 +690,8 @@ ISSUES:
      * @param {function} callback The function to call after data retrieval
      * @private
      */
-    $.Autocompleter.prototype.fetchRemoteData = function (filter, callback) {
-        console.log("fetchRemoteData", filter);
+    $.Autocompleter.prototype.fetchRemoteData = function (filter, fetchRemaining, callback) {
+        console.log("fetchRemoteData", filter, fetchRemaining);
         var data = this.cacheRead(filter);
         if (data) {
             callback(data);
@@ -696,7 +705,7 @@ ISSUES:
                     self.cacheWrite(filter, parsed);
                 }
                 self.dom.$elem.removeClass(self.options.loadingClass);
-                callback(parsed);
+                callback(parsed, fetchRemaining);
             };
             this.dom.$elem.addClass(this.options.loadingClass);
             
@@ -707,7 +716,7 @@ ISSUES:
             }
             
             this.fetchRemoteRequest_ = $.ajax({
-                url: this.makeUrl(filter),
+                url: this.makeUrl(filter, fetchRemaining),
                 success: ajaxCallback,
                 error: function(jqXHR, textStatus, errorThrown) {
                     if($.isFunction(self.options.onError)) {
@@ -749,10 +758,22 @@ ISSUES:
      * @param {string} param The value parameter to pass to the backend
      * @returns {string} The finished url with parameters
      */
-    $.Autocompleter.prototype.makeUrl = function(param) {
+    $.Autocompleter.prototype.makeUrl = function(param, fetchRemaining) {
         var self = this;
         var url = this.options.url;
-        var params = $.extend({}, this.options.extraParams);
+        var limitParams = {};
+
+        if (this.options.limitParam) {
+            if (fetchRemaining) {
+                limitParams[this.options.limitParam] = -1;
+                limitParams[this.options.skipParam] = this.options.numLoadInitial;
+            } else {
+                limitParams[this.options.limitParam] = this.options.numLoadInitial;
+                limitParams[this.options.skipParam] = 0;
+            }
+        }
+    
+        var params = $.extend({}, this.options.extraParams, limitParams);
 
         if (this.options.queryParamName === false) {
             url += encodeURIComponent(param);
@@ -952,10 +973,13 @@ ISSUES:
      * @param results
      * @param filter
      */
-    $.Autocompleter.prototype.showResults = function(results, filter) {
+    $.Autocompleter.prototype.showResults = function(results, filter, append) {
         var numResults = results.length;
         var self = this;
-        this.dom.$list.empty();
+        if (!append) {
+            this.dom.$list.scrollTop(0);
+            this.dom.$list.empty();
+        }
         var i, result, $li, autoWidth, first = false, $first = false;
 
         if (numResults) {
@@ -963,13 +987,16 @@ ISSUES:
                 result = results[i];
                 $li = this.createItemFromResult(result);
                 this.dom.$list.append($li);
-                if (first === false) {
-                    first = String(result.value);
-                    $first = $li;
-                    $li.addClass(this.options.firstItemClass);
-                }
-                if (i === numResults - 1) {
-                    $li.addClass(this.options.lastItemClass);
+
+                if (!append) {
+                    if (first === false) {
+                        first = String(result.value);
+                        $first = $li;
+                        $li.addClass(this.options.firstItemClass);
+                    }
+                    if (i === numResults - 1) {
+                        $li.addClass(this.options.lastItemClass);
+                    }
                 }
             }
 
@@ -978,19 +1005,27 @@ ISSUES:
             // Always recalculate position since window size or
             // input element location may have changed.
             this.position();
+                
             if (this.options.autoWidth) {
                 autoWidth = this.dom.$box.outerWidth() - this.dom.$results.outerWidth() + this.dom.$results.width();
                 this.dom.$results.css(this.options.autoWidth, autoWidth);
                 $('>ul', this.dom.$results).css(this.options.autoWidth, autoWidth); // AR - IE7 - set correct width on the list too otherwise scrollbar is in the middle of div
             }
+            var items = this.getItems();
+            if (append) {
+                items.unbind('mouseenter mouseleave');
+            }
+
             this.getItems().hover(
                 function() { self.focusItem(this); },
                 function() { /* void */ }
             );
-            if (this.autoFill(first, filter) || this.options.selectFirst || (this.options.selectOnly && numResults === 1)) {
-                this.focusItem($first);
+            if (!append) {
+                if (this.autoFill(first, filter) || this.options.selectFirst || (this.options.selectOnly && numResults === 1)) {
+                    this.focusItem($first);
+                }
+                this.active_ = true;
             }
-            this.active_ = true;
         } else {
             this.hideResults();
             this.active_ = false;
@@ -1065,8 +1100,41 @@ ISSUES:
             }
             if ($item) {
                 $item.addClass(this.selectClass_).addClass(this.options.selectClass);
+                this.scrollItemIntoView($item);
             }
         }
+    };
+    
+    /**
+     * Scroll suggestion item into view (based on https://github.com/alexgorbatchev/jquery-textext/blob/master/src/js/textext.plugin.autocomplete.js)
+     * @param {Number} pos
+     */
+    $.Autocompleter.prototype.scrollItemIntoView = function ($item) {
+        console.log("scrollItemIntoView");
+        var itemHeight = $item.outerHeight(),
+			dropdown = this.dom.$list,
+			dropdownHeight = dropdown.innerHeight(),
+			scrollPos = dropdown.scrollTop(),
+			itemTop = ($item.position() || {}).top,
+			scrollTo = null,
+			paddingTop = parseInt(dropdown.css('paddingTop'))
+        ;
+
+        console.log(itemHeight, dropdownHeight, scrollPos, itemTop, paddingTop);
+
+        if (itemTop == null)
+            return;
+
+        // if scrolling down and item is below the bottom fold
+        if (itemTop + itemHeight > dropdownHeight)
+            scrollTo = itemTop + itemHeight + scrollPos - dropdownHeight + paddingTop;
+
+        // if scrolling up and item is above the top fold
+        if (itemTop < 0)
+            scrollTo = itemTop + scrollPos - paddingTop;
+
+        if (scrollTo != null)
+            dropdown.scrollTop(scrollTo);
     };
 
     $.Autocompleter.prototype.selectCurrent = function(skipFocus) {
@@ -1148,6 +1216,7 @@ ISSUES:
             this.lastProcessedValue_ = null;
             this.lastSelectedValue_ = null;
             this.active_ = false;
+            this.lastAllDataLoadedValue_ = null;
         }
         this.setAcValue('');
         this.hideResults();
@@ -1165,7 +1234,7 @@ ISSUES:
             range.moveStart('character', start);
             range.select();
         }
-    };
+    };   
 
     /**
      * Move caret to position
