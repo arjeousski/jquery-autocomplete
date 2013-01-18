@@ -57,7 +57,7 @@ ISSUES:
         lineSeparator: '\n',
         cellSeparator: '|',
         minChars: 2,
-        maxItemsToShow: 10,
+        maxItemsToShow: 10, // This now defines how many items to be shown in the dropdown
         delay: 400,
         useCache: true,
         maxCacheLength: 10,
@@ -394,6 +394,23 @@ ISSUES:
                 case 37: // left
                 case 39: // right
                     break;
+                case 33: // page-up
+                    e.preventDefault();
+                    if (self.active_) {
+                        self.focusPageUp();
+                    } else {
+                        self.activate();
+                    }
+                    return false;
+                    
+                case 34: // page-down
+                    e.preventDefault();
+                    if (self.active_) {
+                        self.focusPageDown();
+                    } else {
+                        self.activate();
+                    }
+                    return false;
 
                 case 38: // up
                     e.preventDefault();
@@ -537,7 +554,16 @@ ISSUES:
      * Position output DOM elements
      * @private
      */
-    $.Autocompleter.prototype.position = function() {
+    $.Autocompleter.prototype.position = function () {
+        var itemsAvailable, $items;
+        // First we need to resize $results to fit desired number of items
+        if (this.itemHeight_) {
+            $items = this.getItems();
+            itemsAvailable = $items.length < this.options.maxItemsToShow ? $items.length : this.options.maxItemsToShow;
+
+            this.dom.$list.height(this.itemHeight_ * itemsAvailable);
+        }
+
         var offset = this.dom.$box.offset();
         var height = this.dom.$results.outerHeight();
         var totalHeight = $(window).outerHeight();
@@ -875,9 +901,10 @@ ISSUES:
         if (this.options.sortResults) {
             filtered = this.sortResults(filtered, filter);
         }
+        /*
         if (this.options.maxItemsToShow > 0 && this.options.maxItemsToShow < filtered.length) {
             filtered.length = this.options.maxItemsToShow;
-        }
+        }*/
         return filtered;
     };
 
@@ -986,7 +1013,7 @@ ISSUES:
             for (i = 0; i < numResults; i++) {
                 result = results[i];
                 $li = this.createItemFromResult(result);
-                this.dom.$list.append($li);
+                this.dom.$list.append($li);               
 
                 if (!append) {
                     if (first === false) {
@@ -1001,6 +1028,12 @@ ISSUES:
             }
 
             this.dom.$results.show();
+            
+            // grab height of one item
+            if (!self.itemHeight_) {
+                self.itemHeight_ = $first.outerHeight();
+                console.log("itemHeight_", self.itemHeight_);
+            }
 
             // Always recalculate position since window size or
             // input element location may have changed.
@@ -1060,6 +1093,14 @@ ISSUES:
             }
         }
         return false;
+    };
+    
+    $.Autocompleter.prototype.focusPageDown = function () {
+        this.focusMove(+this.options.maxItemsToShow);
+    };
+    
+    $.Autocompleter.prototype.focusPageUp = function () {
+        this.focusMove(-this.options.maxItemsToShow);
     };
 
     $.Autocompleter.prototype.focusNext = function() {
