@@ -83,13 +83,16 @@ $(function() {
         filter: false,
         sortResults: false,
         delay: 0,
-        maxItemsToShow: 0,
+        maxItemsToShow: 9, // Note: this needs to be 1 less than numLoadInitial
         useCache: false,
         preventDefaultTab: 2,
         extraParams: {
             op: "ac",
             cid: "123ABC"
         },
+        limitParam: "l",
+        skipParam: "s",
+        numLoadInitial: 10,
         onItemSelect: function (item) {
             console.log("onItemSelect");
             var $elem = $('#result'),
