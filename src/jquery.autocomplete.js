@@ -492,9 +492,7 @@ ISSUES:
          * Use a timeout because instant blur gives race conditions
          */
         var onBlurFunction = function(e) {
-            if (self.showingResults_) {
-                self.deactivate(true);
-            }
+            self.deactivate(true, true);
         };
         
         var onScrollFunction = function() {
@@ -1320,14 +1318,14 @@ ISSUES:
         this.dom.$results.hide();
     };
 
-    $.Autocompleter.prototype.deactivate = function(finish) {
+    $.Autocompleter.prototype.deactivate = function(finish, skipBlur) {
         if (this.finishTimeout_) {
             clearTimeout(this.finishTimeout_);
         }
         if (this.keyTimeout_) {
             clearTimeout(this.keyTimeout_);
         }        
-        if (finish) {            
+        if (finish) {
             if (this.lastProcessedValue_ !== this.lastSelectedValue_) {
                 if (this.options.mustMatch) {
                     if (this.lastSelectedValue_ != null && this.lastSelectedValue_.length > 0) {
@@ -1348,7 +1346,7 @@ ISSUES:
         }
         this.setAcValue('');
         this.hideResults();
-        this.dom.$elem.blur();
+        if (!skipBlur) this.dom.$elem.blur();
     };
 
     $.Autocompleter.prototype.selectRange = function(start, end) {
