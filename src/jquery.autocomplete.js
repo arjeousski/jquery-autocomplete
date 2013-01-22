@@ -88,7 +88,8 @@ ISSUES:
         onError: null,
         limitParam: null,
         skipParam: null,
-        numLoadInitial: 0
+        numLoadInitial: 10,
+        numLoadSubsequent: 100
     };
 
     /**
@@ -311,6 +312,13 @@ ISSUES:
          * @private
          */
         this.fetchRemoteRequest_ = null;
+        
+
+        /**
+         * @property {int} number of records fetched so far
+         * @private
+         */
+        this.numFetched_ = null;
 
         /**
          * Sanitize options
@@ -358,6 +366,12 @@ ISSUES:
         
         // Append autocomplete input
         this.dom.$elem.parent().append(this.dom.$acelem);
+        
+        // Append div for disabled text
+        this.dom.$text = $('<div></div>', { "class": "disabledText" }).hide();
+        this.dom.$elem.parent().append(this.dom.$text);
+        
+        
       
 
 
@@ -514,9 +528,10 @@ ISSUES:
             var $this = $(this);
             if ($this[0].scrollHeight > $this.innerHeight() && $this.scrollTop() + $this.innerHeight() >= $this[0].scrollHeight) {
 
-                if (self.lastAllDataLoadedValue_ !== self.lastProcessedValue_) {
+                console.log(self.numFetched_);
+
+                if (self.numFetched_ !== -1) {
                     self.fetchData(self.lastProcessedValue_, true);
-                    self.lastAllDataLoadedValue_ = self.lastProcessedValue_;
                 }
             }
         };
@@ -581,25 +596,7 @@ ISSUES:
         $elem.parents('form').on('submit', onBlurFunction);
 
     };
-    
-
-    /**
-     * Selects all text in the textbox
-     * @private
-     */
-    $.Autocompleter.prototype.selectAllText = function () {
-        console.log("selectAllText");
-        var value = this.getValue();
-        if (value.length > 0) {
-            this.dom.$elem.select();
-            this.lastSelectedValue_ = value;
-            // Chrome workaround: http://stackoverflow.com/questions/3380458/looking-for-a-better-workaround-to-chrome-select-on-focus-bug
-            this.dom.$elem.on('mouseup', function (e) {
-                e.preventDefault();
-                $(this).unbind("mouseup");
-            });
-        }
-    };
+   
 
     /**
      * Position output DOM elements
@@ -695,6 +692,49 @@ ISSUES:
     };
 
     /**
+     * Disables the input
+     * @public
+     */
+    $.Autocompleter.prototype.disable = function () {
+        if (this.showingResults_) {
+            this.deactivate(true);
+        }
+        
+        this.dom.$box.addClass("acDisabled");
+        
+        this.dom.$arrow.hide();
+        this.dom.$acelem.hide();
+        this.dom.$elem.hide();
+        this.dom.$text.html(this.getValue());
+        this.dom.$text.show();       
+    };
+    
+
+    /**
+     * Enables the input
+     * @public
+     */
+    $.Autocompleter.prototype.enable = function () {
+        this.dom.$text.hide();
+        
+        this.dom.$arrow.show();
+        this.dom.$acelem.show();
+        this.dom.$elem.show();
+
+        this.dom.$box.removeClass("acDisabled");
+    };
+    
+
+    /**
+     * Deletes all traces of the input from DOM
+     * @public
+     */
+    $.Autocompleter.prototype.cleanDOM = function () {
+        this.dom.$box.remove();
+        this.dom.$results.remove();
+    };
+
+    /**
      * Call hook
      * Note that all called hooks are passed the autocompleter object
      * @param {string} hook
@@ -738,24 +778,37 @@ ISSUES:
      * @param {string} value Value to base autocompletion on
      * @private
      */
-    $.Autocompleter.prototype.fetchData = function(value, fetchRemaining) {
+    $.Autocompleter.prototype.fetchData = function(value, fetchNext) {
         var self = this;
+        
+        if (!fetchNext) {
+            self.numFetched_ = 0;
+        }
+            
         var processResults = function(results, filter, append) {
             if (self.options.processData) {
                 results = self.options.processData(results);
             }
+            
+            if ((!append && results.length === self.options.numLoadInitial) || (append && results.length === self.options.numLoadSubsequent)) {
+                self.numFetched_ += results.length;
+            } else {
+                // We got less records than we've asked
+                self.numFetched_ = -1;
+            }           
+
             self.showResults(self.filterResults(results, filter), filter, append);
         };
-        if (!fetchRemaining) {
+        if (!fetchNext) {
             this.lastProcessedValue_ = value;
-            this.lastAllDataLoadedValue_ = null;
         }
+        
         if (value.length < this.options.minChars) {
             processResults([], value);
         } else if (this.options.data) {
             processResults(this.options.data, value);
         } else {
-            this.fetchRemoteData(value, fetchRemaining, function (remoteData, append) {
+            this.fetchRemoteData(value, fetchNext, function (remoteData, append) {
                 processResults(remoteData, value, append);
             });
         }
@@ -767,8 +820,8 @@ ISSUES:
      * @param {function} callback The function to call after data retrieval
      * @private
      */
-    $.Autocompleter.prototype.fetchRemoteData = function (filter, fetchRemaining, callback) {
-        console.log("fetchRemoteData", filter, fetchRemaining);
+    $.Autocompleter.prototype.fetchRemoteData = function (filter, fetchNext, callback) {
+        console.log("fetchRemoteData", filter, fetchNext);
         var data = this.cacheRead(filter);
         if (data) {
             callback(data);
@@ -782,7 +835,7 @@ ISSUES:
                     self.cacheWrite(filter, parsed);
                 }
                 self.dom.$elem.removeClass(self.options.loadingClass);
-                callback(parsed, fetchRemaining);
+                callback(parsed, fetchNext);
             };
             this.dom.$elem.addClass(this.options.loadingClass);
             
@@ -793,7 +846,7 @@ ISSUES:
             }
             
             this.fetchRemoteRequest_ = $.ajax({
-                url: this.makeUrl(filter, fetchRemaining),
+                url: this.makeUrl(filter, fetchNext),
                 success: ajaxCallback,
                 error: function(jqXHR, textStatus, errorThrown) {
                     if($.isFunction(self.options.onError)) {
@@ -835,15 +888,15 @@ ISSUES:
      * @param {string} param The value parameter to pass to the backend
      * @returns {string} The finished url with parameters
      */
-    $.Autocompleter.prototype.makeUrl = function(param, fetchRemaining) {
+    $.Autocompleter.prototype.makeUrl = function(param, fetchNext) {
         var self = this;
         var url = this.options.url;
         var limitParams = {};
 
         if (this.options.limitParam) {
-            if (fetchRemaining) {
-                limitParams[this.options.limitParam] = -1;
-                limitParams[this.options.skipParam] = this.options.numLoadInitial;
+            if (fetchNext) {
+                limitParams[this.options.limitParam] = this.options.numLoadSubsequent;
+                limitParams[this.options.skipParam] = this.numFetched_;
             } else {
                 limitParams[this.options.limitParam] = this.options.numLoadInitial;
                 limitParams[this.options.skipParam] = 0;
@@ -1083,14 +1136,14 @@ ISSUES:
                     }
                 }
             }
+          
+            this.dom.$results.show();
             
             // Fix for FF that scrolls the list to the bottom after creation
             if (!append) {
+                console.log("scroll to top");
                 this.dom.$list.scrollTop(0);
             }
-
-
-            this.dom.$results.show();
             
             // grab height of one item
             if (!self.itemHeight_) {
@@ -1332,7 +1385,6 @@ ISSUES:
             this.lastProcessedValue_ = null;
             this.lastSelectedValue_ = null;
             this.showingResults_ = false;
-            this.lastAllDataLoadedValue_ = null;
         }
         this.setAcValue('');
         this.hideResults();

@@ -30,6 +30,7 @@ $(function() {
         limitParam: "l",
         skipParam: "s",
         numLoadInitial: 10,
+        numLoadSubsequent: 100,
         onItemSelect: function (item) {
             console.log("onItemSelect");
             var $elem = $('#result'),
@@ -37,6 +38,27 @@ $(function() {
             $elem.html(text);
         }
     });
+    
+    var ac = $("#ac5").data('autocompleter');
+    
+    $('#disable').click(function (e) {
+        e.preventDefault();
+        ac.disable();
+    });
+    
+    $('#enable').click(function (e) {
+        e.preventDefault();
+        ac.enable();
+    });
+    
+
+    $('#clean').click(function (e) {
+        e.preventDefault();
+        ac.cleanDOM();
+    });
+
+
+
 
 
 });
@@ -44,7 +66,7 @@ $(function() {
     </script>
 </head>
 
-<body>
+<body bgcolor="#f6f6f6">
 
   
     <h2>Demo 5 (useDelimiter, autoFill, and selectFirst)</h2>
@@ -53,8 +75,15 @@ $(function() {
 
     <form>
         <input type="text" id="ac5"><span id="result"></span>
+        <button id="disable">Disable</button>
+         <button id="enable">Enable</button>
     </form>
 
+        <h2>Demo 5 (useDelimiter, autoFill, and selectFirst)</h2>
+
+    <p>Enter a comma separated list of English birds.</p>
+    
+      <button id="clean">Clean DOM</button>
   
 </body>
 

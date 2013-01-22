@@ -29,6 +29,10 @@
     border: 1px solid gray;
 }
 
+.acDisabled, .acDisabled:hover {
+     border: 1px solid transparent;
+}
+
 .acWrapper .inputWrap {
     margin-right: 1em;
     position: relative;
