@@ -10,7 +10,7 @@
 /*
 ISSUES:
 - Start typeing, esc, select all, then esc again (not auto completing)
-- Issues with scrolling
+- Press arrow, scroll to load more data, select something from new list, click outside (requires 2 clicks)
 */
 (function($) {
     "use strict";
@@ -110,6 +110,7 @@ ISSUES:
             value = result.value;
             data = result.data;
         }
+        
         value = String(value);
         if (typeof data !== 'object') {
             data = {};
@@ -279,6 +280,12 @@ ISSUES:
          * @private
          */
         this.lastProcessedValue_ = null;
+        
+        /**
+         * @property {string} Last value selected by the user
+         * @private
+         */
+        this.lastPotentialValue_ = null;
 
         /**
          * @property {string} Last value selected by the user
@@ -291,7 +298,7 @@ ISSUES:
          * @see showResults
          * @private
          */
-        this.active_ = false;
+        this.showingResults_ = false;
 
         /**
          * @property {boolean} Is this autocompleter allowed to finish on blur?
@@ -368,18 +375,18 @@ ISSUES:
         /**
          * Attach keyboard monitoring to $elem
          */
-        $elem.keydown(function(e) {
+        $elem.keydown(function (e) {
             self.lastKeyPressed_ = e.keyCode;
             console.log("Key Pressed:", self.lastKeyPressed_);
-            switch(self.lastKeyPressed_) {
+            switch (self.lastKeyPressed_) {
 
                 case self.options.delimiterKeyCode: // comma = 188
-                    if (self.options.useDelimiter && self.active_) {
+                    if (self.options.useDelimiter && self.showingResults_) {
                         self.selectCurrent();
                     }
                     break;
 
-                // ignore navigational & special keys
+                    // ignore navigational & special keys
                 case 35: // end
                 case 36: // home
                 case 16: // shift
@@ -390,16 +397,16 @@ ISSUES:
                     break;
                 case 33: // page-up
                     e.preventDefault();
-                    if (self.active_) {
+                    if (self.showingResults_) {
                         self.focusPageUp();
                     } else {
                         self.activate();
                     }
                     return false;
-                    
+
                 case 34: // page-down
                     e.preventDefault();
-                    if (self.active_) {
+                    if (self.showingResults_) {
                         self.focusPageDown();
                     } else {
                         self.activate();
@@ -408,7 +415,7 @@ ISSUES:
 
                 case 38: // up
                     e.preventDefault();
-                    if (self.active_) {
+                    if (self.showingResults_) {
                         self.focusPrev();
                     } else {
                         self.activate();
@@ -417,7 +424,7 @@ ISSUES:
 
                 case 40: // down
                     e.preventDefault();
-                    if (self.active_) {
+                    if (self.showingResults_) {
                         self.focusNext();
                     } else {
                         self.activate();
@@ -425,7 +432,7 @@ ISSUES:
                     return false;
 
                 case 9: // tab
-                    if (self.active_) {
+                    if (self.showingResults_) {
                         self.selectCurrent();
                         if (self.options.preventDefaultTab) {
                             e.preventDefault();
@@ -436,10 +443,10 @@ ISSUES:
                         e.preventDefault();
                         return false;
                     }
-                break;
+                    break;
 
                 case 13: // return
-                    if (self.active_) {
+                    if (self.showingResults_) {
                         self.selectCurrent();
                         if (self.options.preventDefaultReturn) {
                             e.preventDefault();
@@ -450,20 +457,21 @@ ISSUES:
                         e.preventDefault();
                         return false;
                     }
-                break;
+                    break;
 
                 case 27: // escape
-                    if (self.active_) {
+                    if (self.showingResults_) {
                         e.preventDefault();
                         self.deactivate(true);
                         return false;
                     }
-                break;
+                    break;
 
                 default:
                     self.activate();
 
             }
+            return true;
         });
 
         /**
@@ -471,43 +479,37 @@ ISSUES:
          * Use a timeout because instant blur gives race conditions
          */
         var onBlurFunction = function(e) {
-            console.log("onBlurFunction");
-            if (self.isMouseDownInAutocomplete_) {
-                setTimeout(function () {
-                    $elem.focus();
-                    
-                    // Set to previous position
-                    self.setCaret(self.caretPosition_.start);
-                    self.caretPosition_ = null;
-                }, 1);
-            } else {
-                if (!self.isClickOnArrow_) {
-                    if (self.active_) {
-                        self.selectCurrent(true);
-                    } else {
-                        self.deactivate(true);
-                    }
+            console.log("onBlurFunction", self.showingResults_, self.isMouseDownInAutocomplete_, self.isClickOnArrow_);
+
+            if (self.isMouseDownInAutocomplete_) // lost focus because mouse was clicked in results dropdown
+            {
+                self.dom.$elem.focus();
+
+                // Set to previous position
+                self.setCaret(self.caretPosition_.start);
+                self.caretPosition_ = null;
+            } else if (self.isClickOnArrow_) // lost focus because arrow was clicked
+            {
+                // Focus back on the textbox
+                self.dom.$elem.focus();
+            } else // lost focus because of othe reasons
+            {
+                /*
+                if (self.showingResults_) {
+                    self.selectCurrent(true);
+                } else {
+                */
+                if (self.showingResults_) {
+                    self.deactivate(true);
                 }
-            }
+                //}
+            }            
+            
             // Reset all flags
             self.isClickOnArrow_ = false;
             self.isMouseDownInAutocomplete_ = false;
         };
         
-        // Selects all text in the textbox
-        var selectAllText = function () {
-            var len = self.getValue().length;
-            if (len > 0) {
-                self.dom.$elem.select();
-                self.lastSelectedValue_ = self.getValue();
-                // Chrome workaround: http://stackoverflow.com/questions/3380458/looking-for-a-better-workaround-to-chrome-select-on-focus-bug
-                $elem.on('mouseup',function (e) {
-                    e.preventDefault();
-                    $(this).unbind("mouseup");
-                });
-            }
-        };
-
         var onScrollFunction = function() {
             var $this = $(this);
             if ($this[0].scrollHeight > $this.innerHeight() && $this.scrollTop() + $this.innerHeight() >= $this[0].scrollHeight) {
@@ -528,10 +530,15 @@ ISSUES:
         
         // FOCUS event on input element
         $elem.on('focus', function () {
-            // Only trigger this if focus isn't coming from autocomplete box
-            if (!self.isMouseDownInAutocomplete_) {
-                selectAllText();
-            }
+            console.log("focus");
+            // Only trigger this if focus isn't coming from autocomplete box or arrow
+            var value = self.getValue();
+            self.lastSelectedValue_ = value;
+            self.setAcValue(self.lastSelectedValue_);
+            self.setValue('');
+            self.activate();
+            
+
         });
 
         // SCROLL event on LIST
@@ -539,7 +546,7 @@ ISSUES:
 
         // MOUSEDOWN on LIST
         this.dom.$list.on('mousedown',function() {
-            self.isMouseDownInAutocomplete_ = true;
+            //self.isMouseDownInAutocomplete_ = true;
             self.caretPosition_ = self.getCaret();
         });
         
@@ -556,14 +563,12 @@ ISSUES:
 
         // Attach click event for arrow
         this.dom.$arrow.click(function (event) {
-            self.isClickOnArrow_ = true;
+            //self.isClickOnArrow_ = true;
+            
             // Same event as down arrow on keyboard
-            if (!self.active_) {
-                console.log("arrow click");
-                self.activate();
-                self.focusNext();
+            if (!self.showingResults_) {
+                console.log("arrow click");                
                 self.dom.$elem.focus();
-                console.log("arrow click done");
             }
             event.preventDefault();
             return false;
@@ -575,6 +580,25 @@ ISSUES:
          */
         $elem.parents('form').on('submit', onBlurFunction);
 
+    };
+    
+
+    /**
+     * Selects all text in the textbox
+     * @private
+     */
+    $.Autocompleter.prototype.selectAllText = function () {
+        console.log("selectAllText");
+        var value = this.getValue();
+        if (value.length > 0) {
+            this.dom.$elem.select();
+            this.lastSelectedValue_ = value;
+            // Chrome workaround: http://stackoverflow.com/questions/3380458/looking-for-a-better-workaround-to-chrome-select-on-focus-bug
+            this.dom.$elem.on('mouseup', function (e) {
+                e.preventDefault();
+                $(this).unbind("mouseup");
+            });
+        }
     };
 
     /**
@@ -704,7 +728,7 @@ ISSUES:
     $.Autocompleter.prototype.activateNow = function() {
         var value = this.beforeUseConverter(this.dom.$elem.val());
         console.log("activateNow", value, this.lastProcessedValue_, this.lastSelectedValue_);
-        if ((value !== this.lastProcessedValue_ && value !== this.lastSelectedValue_) || (this.lastKeyPressed_ === 46 || this.lastKeyPressed_ === 8)) {
+        if ((value !== this.lastProcessedValue_) || (this.lastKeyPressed_ === 46 || this.lastKeyPressed_ === 8)) {
             this.fetchData(value);
         }
     };
@@ -1074,7 +1098,7 @@ ISSUES:
                 
             if (this.options.autoWidth) {
                 autoWidth = this.dom.$box.outerWidth() - this.dom.$results.outerWidth() + this.dom.$results.width();
-                this.dom.$results.css(this.options.autoWidth, autoWidth);
+                //this.dom.$results.css(this.options.autoWidth, autoWidth);
                 $('>ul', this.dom.$results).css(this.options.autoWidth, autoWidth); // AR - IE7 - set correct width on the list too otherwise scrollbar is in the middle of div
             }
             var items = this.getItems();
@@ -1090,13 +1114,14 @@ ISSUES:
             );
             if (!append) {
                 if (this.autoFill(first, filter) || this.options.selectFirst || (this.options.selectOnly && numResults === 1)) {
+                    console.log("focusFirst");
                     this.focusItem($first);
                 }
-                this.active_ = true;
+                this.showingResults_ = true;
             }
         } else {
             this.hideResults();
-            this.active_ = false;
+            this.showingResults_ = false;
             this.setAcValue('');
         }
     };
@@ -1116,15 +1141,17 @@ ISSUES:
             lcValue = String(value).toLowerCase();
             lcFilter = String(filter).toLowerCase();
             filterLength = filter.length;
-            if (lcValue.substr(0, filterLength) === lcFilter) {
+            if (filterLength > 0 && lcValue.substr(0, filterLength) === lcFilter) {
                 // NOTE: Delimiter is not handled)
                 this.lastProcessedValue_ = value.substr(0, filterLength);
-                this.setValue(this.lastProcessedValue_);                
+                this.setValue(this.lastProcessedValue_);
                 this.setAcValue(value);
                 //this.selectRange(start, end);
                 return true;
             } else {
-                this.setAcValue(value);
+                if (filterLength == 0) {
+                    this.setAcValue(this.lastSelectedValue_);
+                }
             }
         }
         return false;
@@ -1179,14 +1206,14 @@ ISSUES:
                 
                 $item.addClass(this.selectClass_).addClass(this.options.selectClass);
                 this.scrollItemIntoView($item);
-                var value = $item.data('value');
+                /*var value = $item.data('value');
                 if (value.substr(0, this.lastProcessedValue_.length) !== this.lastProcessedValue_) {
                     this.setValue('');
                     this.setAcValue(value);
                 } else {
                     this.setValue(this.lastProcessedValue_);
                     this.setAcValue(value);                    
-                }
+                }*/
             }
         }
     };
@@ -1225,7 +1252,7 @@ ISSUES:
         if ($item.length === 1) {
             this.selectItem($item, skipFocus);
         } else {
-            this.deactivate(false);
+            this.deactivate(true);
         }
     };
 
@@ -1255,13 +1282,13 @@ ISSUES:
             }
         }
         this.setValue(displayValue);
-        this.setAcValue("");       
+        this.setAcValue("");
         this.callHook('onItemSelect', { value: value, data: data });
         this.deactivate(true);
-        if (!skipFocus) {
+        /*if (!skipFocus) {
             this.setCaret(d.start + displayValue.length + extraCaretPos);
             elem.focus();
-        }
+        }*/
     };
 
     $.Autocompleter.prototype.displayValue = function(value, data) {
@@ -1286,7 +1313,7 @@ ISSUES:
         if (finish) {            
             if (this.lastProcessedValue_ !== this.lastSelectedValue_) {
                 if (this.options.mustMatch) {
-                    if (this.lastSelectedValue_.length > 0) {
+                    if (this.lastSelectedValue_ != null && this.lastSelectedValue_.length > 0) {
                         this.setValue(this.lastSelectedValue_);
                     } else {
                         this.setValue('');
@@ -1294,17 +1321,18 @@ ISSUES:
                 }
                 this.callHook('onNoMatch');
             }
-            if (this.active_) {
+            if (this.showingResults_) {
                 this.callHook('onFinish');
             }            
             this.lastKeyPressed_ = null;
             this.lastProcessedValue_ = null;
             this.lastSelectedValue_ = null;
-            this.active_ = false;
+            this.showingResults_ = false;
             this.lastAllDataLoadedValue_ = null;
         }
         this.setAcValue('');
         this.hideResults();
+        this.dom.$elem.blur();
     };
 
     $.Autocompleter.prototype.selectRange = function(start, end) {
