@@ -391,7 +391,6 @@ ISSUES:
          */
         $elem.keydown(function (e) {
             self.lastKeyPressed_ = e.keyCode;
-            console.log("Key Pressed:", self.lastKeyPressed_);
             switch (self.lastKeyPressed_) {
 
                 case self.options.delimiterKeyCode: // comma = 188
@@ -493,43 +492,14 @@ ISSUES:
          * Use a timeout because instant blur gives race conditions
          */
         var onBlurFunction = function(e) {
-            console.log("onBlurFunction", self.showingResults_, self.isMouseDownInAutocomplete_, self.isClickOnArrow_);
-
-            if (self.isMouseDownInAutocomplete_) // lost focus because mouse was clicked in results dropdown
-            {
-                self.dom.$elem.focus();
-
-                // Set to previous position
-                self.setCaret(self.caretPosition_.start);
-                self.caretPosition_ = null;
-            } else if (self.isClickOnArrow_) // lost focus because arrow was clicked
-            {
-                // Focus back on the textbox
-                self.dom.$elem.focus();
-            } else // lost focus because of othe reasons
-            {
-                /*
-                if (self.showingResults_) {
-                    self.selectCurrent(true);
-                } else {
-                */
-                if (self.showingResults_) {
-                    self.deactivate(true);
-                }
-                //}
-            }            
-            
-            // Reset all flags
-            self.isClickOnArrow_ = false;
-            self.isMouseDownInAutocomplete_ = false;
+            if (self.showingResults_) {
+                self.deactivate(true);
+            }
         };
         
         var onScrollFunction = function() {
             var $this = $(this);
             if ($this[0].scrollHeight > $this.innerHeight() && $this.scrollTop() + $this.innerHeight() >= $this[0].scrollHeight) {
-
-                console.log(self.numFetched_);
-
                 if (self.numFetched_ !== -1) {
                     self.fetchData(self.lastProcessedValue_, true);
                 }
@@ -545,7 +515,6 @@ ISSUES:
         
         // FOCUS event on input element
         $elem.on('focus', function () {
-            console.log("focus");
             // Only trigger this if focus isn't coming from autocomplete box or arrow
             var value = self.getValue();
             self.lastSelectedValue_ = value;
@@ -566,13 +535,11 @@ ISSUES:
         });
         
         this.dom.$box.click(function (event) {
-            console.log("box.click");
             self.dom.$elem.focus();
         });
 
         // Make sure we don't call box.click when input field was clicked
         this.dom.$elem.click(function (event) {
-            console.log("input.click");
             event.stopPropagation();
         });
 
@@ -581,8 +548,7 @@ ISSUES:
             //self.isClickOnArrow_ = true;
             
             // Same event as down arrow on keyboard
-            if (!self.showingResults_) {
-                console.log("arrow click");                
+            if (!self.showingResults_) {        
                 self.dom.$elem.focus();
             }
             event.preventDefault();
@@ -767,7 +733,6 @@ ISSUES:
      */
     $.Autocompleter.prototype.activateNow = function() {
         var value = this.beforeUseConverter(this.dom.$elem.val());
-        console.log("activateNow", value, this.lastProcessedValue_, this.lastSelectedValue_);
         if ((value !== this.lastProcessedValue_) || (this.lastKeyPressed_ === 46 || this.lastKeyPressed_ === 8)) {
             this.fetchData(value);
         }
@@ -821,7 +786,6 @@ ISSUES:
      * @private
      */
     $.Autocompleter.prototype.fetchRemoteData = function (filter, fetchNext, callback) {
-        console.log("fetchRemoteData", filter, fetchNext);
         var data = this.cacheRead(filter);
         if (data) {
             callback(data);
@@ -1141,7 +1105,6 @@ ISSUES:
             
             // Fix for FF that scrolls the list to the bottom after creation
             if (!append) {
-                console.log("scroll to top");
                 this.dom.$list.scrollTop(0);
             }
             
@@ -1245,7 +1208,6 @@ ISSUES:
     };
 
     $.Autocompleter.prototype.focusItem = function (item) {
-        console.log("focusItem");
         var $item, $items = this.getItems(), $selectedItems = $items.filter("." + this.selectClass_);
         if ($items.length) {
             $selectedItems.removeClass(this.selectClass_).removeClass(this.options.selectClass);
@@ -1316,7 +1278,6 @@ ISSUES:
     $.Autocompleter.prototype.selectItem = function ($li, skipFocus) {        
         var value = $li.data('value');
         var data = $li.data('data');
-        console.log("selectItem", value, skipFocus);
         var displayValue = this.displayValue(value, data);
         var processedDisplayValue = this.beforeUseConverter(displayValue);
         this.lastProcessedValue_ = processedDisplayValue;
@@ -1360,7 +1321,6 @@ ISSUES:
     };
 
     $.Autocompleter.prototype.deactivate = function(finish) {
-        console.log("deactivate", finish, this.lastProcessedValue_, this.lastSelectedValue_);
         if (this.finishTimeout_) {
             clearTimeout(this.finishTimeout_);
         }
