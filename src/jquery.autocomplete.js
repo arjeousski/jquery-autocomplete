@@ -1063,7 +1063,6 @@ ISSUES:
 
         if (!append) {
             this.dom.$list.empty();
-            this.dom.$list.scrollTop(0);
         }
         var i, result, $li, autoWidth, first = false, $first = false;
 
@@ -1084,6 +1083,12 @@ ISSUES:
                     }
                 }
             }
+            
+            // Fix for FF that scrolls the list to the bottom after creation
+            if (!append) {
+                this.dom.$list.scrollTop(0);
+            }
+
 
             this.dom.$results.show();
             
@@ -1114,7 +1119,6 @@ ISSUES:
             );
             if (!append) {
                 if (this.autoFill(first, filter) || this.options.selectFirst || (this.options.selectOnly && numResults === 1)) {
-                    console.log("focusFirst");
                     this.focusItem($first);
                 }
                 this.showingResults_ = true;
