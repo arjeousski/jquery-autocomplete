@@ -269,6 +269,7 @@ ISSUES:
          * @private
          */
         this.finishTimeout_ = null;
+        this.focusTimeout_ = null;
 
         /**
          * @property {number} Last key pressed in the input field (store for behavior)
@@ -491,7 +492,7 @@ ISSUES:
          * Events functions
          * Use a timeout because instant blur gives race conditions
          */
-        var onBlurFunction = function(e) {
+        var onBlurFunction = function (e) {
             self.deactivate(true, true);
         };
         
@@ -505,22 +506,30 @@ ISSUES:
         };
         
         // BLUR event on input element
-        $elem.on('blur',function() {
+        $elem.on('blur', function () {
             if (self.finishOnBlur_) {
                 self.finishTimeout_ = setTimeout(onBlurFunction, 200);
             }
         });
+
+        var focusFunction = function() {
+            // Only trigger this if focus isn't coming from autocomplete box or arrow
+            if (self.lastSelectedValue_ == null) {
+                var value = self.getValue();
+                self.lastSelectedValue_ = value;
+                self.setAcValue(self.lastSelectedValue_);
+                self.setValue('');
+                self.activate();
+            }
+
+
+        };
         
         // FOCUS event on input element
-        $elem.on('focus', function () {
-            // Only trigger this if focus isn't coming from autocomplete box or arrow
-            var value = self.getValue();
-            self.lastSelectedValue_ = value;
-            self.setAcValue(self.lastSelectedValue_);
-            self.setValue('');
-            self.activate();
-            
-
+        $elem.on('focus', function (event) {
+            if (!self.showingResults_) {
+                focusFunction();
+            }
         });
 
         // SCROLL event on LIST
@@ -1334,7 +1343,11 @@ ISSUES:
         }
         if (this.keyTimeout_) {
             clearTimeout(this.keyTimeout_);
-        }        
+        }
+        
+        if (this.focusTimeout_) {
+            clearTimeout(this.focusTimeout_);
+        }
         if (finish) {
             if (this.lastProcessedValue_ !== this.lastSelectedValue_) {
                 if (this.options.mustMatch) {
