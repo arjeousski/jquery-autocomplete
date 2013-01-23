@@ -287,12 +287,6 @@ ISSUES:
          * @property {string} Last value selected by the user
          * @private
          */
-        this.lastPotentialValue_ = null;
-
-        /**
-         * @property {string} Last value selected by the user
-         * @private
-         */
         this.lastSelectedValue_ = null; 
 
         /**
@@ -512,9 +506,9 @@ ISSUES:
             }
         });
 
-        var focusFunction = function() {
+        var focusFunction = function () {
             // Only trigger this if focus isn't coming from autocomplete box or arrow
-            if (self.lastSelectedValue_ == null) {
+            if (self.lastSelectedValue_ == null) {                
                 var value = self.getValue();
                 self.lastSelectedValue_ = value;
                 self.setAcValue(self.lastSelectedValue_);
@@ -525,11 +519,9 @@ ISSUES:
 
         };
         
-        // FOCUS event on input element
+        // FOCUS event on input element        
         $elem.on('focus', function (event) {
-            if (!self.showingResults_) {
-                focusFunction();
-            }
+            self.focusTimeout_ = setTimeout(focusFunction, 0);            
         });
 
         // SCROLL event on LIST
@@ -666,16 +658,21 @@ ISSUES:
      * @public
      */
     $.Autocompleter.prototype.disable = function () {
-        if (this.showingResults_) {
+        /*if (this.showingResults_) {*/
             this.deactivate(true);
-        }
+        //}
         
         this.dom.$box.addClass("acDisabled");
         
         this.dom.$arrow.hide();
         this.dom.$acelem.hide();
         this.dom.$elem.hide();
-        this.dom.$text.html(this.getValue());
+        
+        var value = this.getValue();
+        /*if (value.length == 0) {
+            value = this.lastSelectedValue_;
+        }*/
+        this.dom.$text.html(value);
         this.dom.$text.show();
 
 
