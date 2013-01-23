@@ -679,14 +679,20 @@ ISSUES:
      * @public
      */
     $.Autocompleter.prototype.enable = function () {
+        var self = this;
+        
+        // Hide Text
         this.dom.$text.hide();
         
+        // Show input fields + arrow
         this.dom.$arrow.show();
         this.dom.$acelem.show();
         this.dom.$elem.show();
 
+        // Mark box as enabled
         this.dom.$box.removeClass("acDisabled");
         
+        // Bind box clicking event
         this.dom.$box.on('click', function() {
             self.dom.$elem.focus();
         });
