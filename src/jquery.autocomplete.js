@@ -14,7 +14,7 @@ ISSUES:
 */
 (function($) {
     "use strict";
-
+     
     /**
      * jQuery autocomplete plugin
      * @param {object|string} options
@@ -531,10 +531,6 @@ ISSUES:
             //self.isMouseDownInAutocomplete_ = true;
             self.caretPosition_ = self.getCaret();
         });
-        
-        this.dom.$box.click(function (event) {
-            self.dom.$elem.focus();
-        });
 
         // Make sure we don't call box.click when input field was clicked
         this.dom.$elem.click(function (event) {
@@ -559,6 +555,7 @@ ISSUES:
          */
         $elem.parents('form').on('submit', onBlurFunction);
 
+        this.enable();
     };
    
 
@@ -670,7 +667,10 @@ ISSUES:
         this.dom.$acelem.hide();
         this.dom.$elem.hide();
         this.dom.$text.html(this.getValue());
-        this.dom.$text.show();       
+        this.dom.$text.show();
+
+
+        this.dom.$box.off('click');
     };
     
 
@@ -686,6 +686,10 @@ ISSUES:
         this.dom.$elem.show();
 
         this.dom.$box.removeClass("acDisabled");
+        
+        this.dom.$box.on('click', function() {
+            self.dom.$elem.focus();
+        });
     };
     
 
