@@ -1185,6 +1185,8 @@ ISSUES:
             } else {
                 if (filterLength == 0) {
                     this.setAcValue(this.lastSelectedValue_);
+                } else {
+                    this.setAcValue('');
                 }
             }
         }
