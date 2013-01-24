@@ -528,7 +528,7 @@ ISSUES:
         this.dom.$list.on('scroll', onScrollFunction);
 
         // MOUSEDOWN on LIST
-        this.dom.$list.on('mousedown',function() {
+        this.dom.$list.on('mousedown', function () {
             //self.isMouseDownInAutocomplete_ = true;
             self.caretPosition_ = self.getCaret();
         });
@@ -558,7 +558,29 @@ ISSUES:
 
         this.enable();
     };
-   
+    
+    
+    /**
+     * Set Extra Box Element
+     * @public
+     */
+    $.Autocompleter.prototype.setFloat = function ($float) {
+        var self = this;
+        this.dom.$extra = $('<div></div>', {"class": this.options.resultsClass + " acResultsFloat"}).hide().css({
+            position: 'absolute', top: 0
+        });
+
+        this.dom.$extra.on('mousedown', function (e) {
+            self.dom.$elem.focus();
+            e.preventDefault();
+        });
+
+        this.dom.$extra.append($float);
+
+        $('body').append(this.dom.$extra);
+        
+    };
+
 
     /**
      * Position output DOM elements
@@ -589,6 +611,25 @@ ISSUES:
             }
         }
         this.dom.$results.css(position);
+
+        if (this.dom.$extra) {
+            var extraHeight = this.dom.$extra.outerHeight();
+            var extraPosition = { top: inputBottom + height, left: offset.left };
+
+            this.dom.$extra.css(extraPosition);
+        }
+
+        if (this.options.autoWidth) {
+            var autoWidth = this.dom.$box.outerWidth() - this.dom.$results.outerWidth() + this.dom.$results.width();
+            //this.dom.$results.css(this.options.autoWidth, autoWidth);
+            $('>ul', this.dom.$results).css(this.options.autoWidth, autoWidth); // AR - IE7 - set correct width on the list too otherwise scrollbar is in the middle of div
+            
+            if (this.dom.$extra) {
+                // We need to calculate it again because it may have padding
+                autoWidth = this.dom.$box.outerWidth() - this.dom.$extra.outerWidth() + this.dom.$extra.width();
+                this.dom.$extra.css(this.options.autoWidth, autoWidth);
+            }
+        }
     };
 
     /**
@@ -712,6 +753,7 @@ ISSUES:
     $.Autocompleter.prototype.cleanDOM = function () {
         this.dom.$box.remove();
         this.dom.$results.remove();
+        this.dom.$extra.remove();
     };
 
     /**
@@ -856,6 +898,10 @@ ISSUES:
             if (this.options.extraParams[index] !== value) {
                 this.options.extraParams[index] = value;
                 this.cacheFlush();
+                if (this.showingResults_) {
+                    this.lastProcessedValue_ = null;
+                    this.activateNow();
+                }
             }
         }
     };
@@ -1117,6 +1163,10 @@ ISSUES:
           
             this.dom.$results.show();
             
+            if (this.dom.$extra) {
+                this.dom.$extra.show();
+            }
+            
             // Fix for FF that scrolls the list to the bottom after creation
             if (!append) {
                 this.dom.$list.scrollTop(0);
@@ -1131,11 +1181,6 @@ ISSUES:
             // input element location may have changed.
             this.position();
                 
-            if (this.options.autoWidth) {
-                autoWidth = this.dom.$box.outerWidth() - this.dom.$results.outerWidth() + this.dom.$results.width();
-                //this.dom.$results.css(this.options.autoWidth, autoWidth);
-                $('>ul', this.dom.$results).css(this.options.autoWidth, autoWidth); // AR - IE7 - set correct width on the list too otherwise scrollbar is in the middle of div
-            }
             var items = this.getItems();
             
             // unbind events from existing items
@@ -1334,6 +1379,9 @@ ISSUES:
 
     $.Autocompleter.prototype.hideResults = function() {
         this.dom.$results.hide();
+        if (this.dom.$extra) {
+            this.dom.$extra.hide();
+        }
     };
 
     $.Autocompleter.prototype.deactivate = function(finish, skipBlur) {
