@@ -489,7 +489,6 @@ ISSUES:
          * Use a timeout because instant blur gives race conditions
          */
         var onBlurFunction = function (e) {
-            console.log("blur");
             if (!self.isMouseOverDropdown_ || !self.showingResults_) {
                 self.deactivate(true, true);                
             } else {
@@ -498,20 +497,16 @@ ISSUES:
                     self.dom.$elem.focus();
                 }, 0);
             }
-            self.isMouseOverDropdown_ = false;
         };
                 
         // BLUR event on input element
-        $elem.on('blur', function (e) {
-            onBlurFunction(e);
-            /*
+        $elem.on('blur', function (e) {            
             if (self.finishOnBlur_) {
                 self.finishTimeout_ = setTimeout(onBlurFunction, 200);
-            }*/
+            }
         });
 
         var focusFunction = function () {
-            console.log("focus");
             // Only trigger this if focus isn't coming from autocomplete box or arrow
             if (self.lastSelectedValue_ == null) {
                 var value = self.getValue();
@@ -528,28 +523,25 @@ ISSUES:
         });
         
         var onScrollFunction = function () {
-            console.log("scroll");
-            self.dom.$elem.focus();
             var $this = $(this);
             if ($this[0].scrollHeight > $this.innerHeight() && $this.scrollTop() + $this.innerHeight() >= $this[0].scrollHeight) {
                 if (self.numFetched_ !== -1) {
-                    self.fetchData(self.lastProcessedValue_, true);
+                    
+                    if (self.fetchMoreTimeout_) {
+                        clearTimeout(self.fetchMoreTimeout_);
+                    }
+                    self.fetchMoreTimeout_ = setTimeout(function() {
+                        self.fetchData(self.lastProcessedValue_, true);
+                    }, 100);                                            
+                    
                 }
             }
-            self.isMouseOverDropdown_ = false;
         };
 
         // SCROLL event on LIST
         this.dom.$list.on('scroll', onScrollFunction);
-
-        // MOUSEDOWN on LIST
-        this.dom.$list.on('mousedown', function (event) {
-            console.log("mousedown");
-            self.isMouseOverDropdown_ = true;
-            self.caretPosition_ = self.getCaret();
-            event.preventDefault();
-            event.stopPropagation();
-        });
+        
+        self.preventBlur(this.dom.$results);        
 
         // Make sure we don't call box.click when input field was clicked
         this.dom.$elem.click(function (event) {
@@ -557,9 +549,7 @@ ISSUES:
         });
 
         // Attach click event for arrow
-        this.dom.$arrow.click(function (event) {
-            //self.isClickOnArrow_ = true;
-            
+        this.dom.$arrow.click(function (event) {            
             // Same event as down arrow on keyboard
             if (!self.showingResults_) {        
                 self.dom.$elem.focus();
@@ -576,6 +566,17 @@ ISSUES:
 
         this.enable();
     };
+
+    $.Autocompleter.prototype.preventBlur = function($element) {
+        var self = this;
+        $element.on('mouseenter', function() {
+            self.isMouseOverDropdown_ = true;
+        });
+
+        $element.on('mouseleave', function() {
+            self.isMouseOverDropdown_ = false;
+        });
+    };
     
     
     /**
@@ -588,10 +589,7 @@ ISSUES:
             position: 'absolute', top: 0
         });
 
-        this.dom.$extra.on('mousedown', function (e) {
-            self.dom.$elem.focus();
-            e.preventDefault();
-        });
+        self.preventBlur(this.dom.$extra);
 
         this.dom.$extra.append($float);
 
@@ -1187,7 +1185,6 @@ ISSUES:
             
             // Fix for FF that scrolls the list to the bottom after creation
             if (!append) {
-                console.log("scrolltop");
                 setTimeout(function () {
                     self.dom.$list.scrollTop(0);
                 }, 0);                
