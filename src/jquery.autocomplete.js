@@ -314,6 +314,8 @@ ISSUES:
          * @private
          */
         this.numFetched_ = null;
+        
+        this.isMouseOverDropdown_ = null;
 
         /**
          * Sanitize options
@@ -487,50 +489,66 @@ ISSUES:
          * Use a timeout because instant blur gives race conditions
          */
         var onBlurFunction = function (e) {
-            self.deactivate(true, true);
-        };
-        
-        var onScrollFunction = function() {
-            var $this = $(this);
-            if ($this[0].scrollHeight > $this.innerHeight() && $this.scrollTop() + $this.innerHeight() >= $this[0].scrollHeight) {
-                if (self.numFetched_ !== -1) {
-                    self.fetchData(self.lastProcessedValue_, true);
-                }
+            console.log("blur");
+            if (!self.isMouseOverDropdown_ || !self.showingResults_) {
+                self.deactivate(true, true);                
+            } else {
+                // If we didn't mean to leave focus, focus back
+                setTimeout(function () {
+                    self.dom.$elem.focus();
+                }, 0);
             }
+            self.isMouseOverDropdown_ = false;
         };
-        
+                
         // BLUR event on input element
-        $elem.on('blur', function () {
+        $elem.on('blur', function (e) {
+            onBlurFunction(e);
+            /*
             if (self.finishOnBlur_) {
                 self.finishTimeout_ = setTimeout(onBlurFunction, 200);
-            }
+            }*/
         });
 
         var focusFunction = function () {
+            console.log("focus");
             // Only trigger this if focus isn't coming from autocomplete box or arrow
-            if (self.lastSelectedValue_ == null) {                
+            if (self.lastSelectedValue_ == null) {
                 var value = self.getValue();
                 self.lastSelectedValue_ = value;
                 self.setAcValue(self.lastSelectedValue_);
                 self.setValue('');
                 self.activate();
             }
-
-
         };
         
         // FOCUS event on input element        
         $elem.on('focus', function (event) {
-            self.focusTimeout_ = setTimeout(focusFunction, 0);            
+            self.focusTimeout_ = setTimeout(focusFunction, 200);            
         });
+        
+        var onScrollFunction = function () {
+            console.log("scroll");
+            self.dom.$elem.focus();
+            var $this = $(this);
+            if ($this[0].scrollHeight > $this.innerHeight() && $this.scrollTop() + $this.innerHeight() >= $this[0].scrollHeight) {
+                if (self.numFetched_ !== -1) {
+                    self.fetchData(self.lastProcessedValue_, true);
+                }
+            }
+            self.isMouseOverDropdown_ = false;
+        };
 
         // SCROLL event on LIST
         this.dom.$list.on('scroll', onScrollFunction);
 
         // MOUSEDOWN on LIST
-        this.dom.$list.on('mousedown', function () {
-            //self.isMouseDownInAutocomplete_ = true;
+        this.dom.$list.on('mousedown', function (event) {
+            console.log("mousedown");
+            self.isMouseOverDropdown_ = true;
             self.caretPosition_ = self.getCaret();
+            event.preventDefault();
+            event.stopPropagation();
         });
 
         // Make sure we don't call box.click when input field was clicked
@@ -1169,7 +1187,10 @@ ISSUES:
             
             // Fix for FF that scrolls the list to the bottom after creation
             if (!append) {
-                this.dom.$list.scrollTop(0);
+                console.log("scrolltop");
+                setTimeout(function () {
+                    self.dom.$list.scrollTop(0);
+                }, 0);                
             }
             
             // grab height of one item
