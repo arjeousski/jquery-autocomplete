@@ -30,7 +30,8 @@ ISSUES:
             url = options;
             options = { url: url };
         }
-        var opts = $.extend({}, $.fn.autocomplete.defaults, options);
+        // Do a deep copy so that new extraParams object is created
+        var opts = $.extend(true, {}, $.fn.autocomplete.defaults, options);
         return this.each(function() {
             var $this = $(this);
             $this.data('autocompleter', new $.Autocompleter(
@@ -797,6 +798,7 @@ ISSUES:
         }
         this.keyTimeout_ = setTimeout(function() {
             self.activateNow();
+            self.dom.$box.addClass("acActive");
         }, this.options.delay);
     };
 
@@ -1157,7 +1159,7 @@ ISSUES:
         if (!append) {
             this.dom.$list.empty();
         }
-        var i, result, $li, autoWidth, first = false, $first = false;
+        var i, result, $li, first = false, $first = false;
 
         if (numResults) {
             for (i = 0; i < numResults; i++) {
@@ -1434,6 +1436,7 @@ ISSUES:
         }
         this.setAcValue('');
         this.hideResults();
+        this.dom.$box.removeClass("acActive");
         if (!skipBlur) this.dom.$elem.blur();
     };
 
