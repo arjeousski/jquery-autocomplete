@@ -52,6 +52,7 @@ ISSUES:
         loadingClass: 'acLoading',
         resultsClass: 'acResults',
         selectClass: 'acSelect',
+        noMatchMessage: 'No items found',
         queryParamName: 'q',
         extraParams: {},
         remoteDataType: false,
@@ -269,7 +270,7 @@ ISSUES:
          * @property {number} Handler to finish timeout
          * @private
          */
-        this.finishTimeout_ = null;
+        this.blurTimeout_ = null;
         this.focusTimeout_ = null;
 
         /**
@@ -316,7 +317,7 @@ ISSUES:
          */
         this.numFetched_ = null;
         
-        this.isMouseOverDropdown_ = null;
+        this.isMouseOverControlElement_ = null;
 
         /**
          * Sanitize options
@@ -347,12 +348,12 @@ ISSUES:
          */
         this.dom.$elem.attr('autocomplete', 'off').addClass(this.options.inputClass);
         
+        // Clone input element
+        this.dom.$acelem = this.dom.$elem.clone().attr({ 'id': '', 'disabled': 'disabled' }).addClass(this.options.inputAcClass);
+
         /**
          * Replace input field with DIV and autocomplete backing field
          */
-
-        // Clone input element
-        this.dom.$acelem = this.dom.$elem.clone().attr({ 'id':'', 'disabled' : 'disabled' }).addClass(this.options.inputAcClass);        
         // Wrap div around input
         this.dom.$elem.wrap($('<div><div class="inputWrap"></div></div>').addClass(this.options.inputWrapper));
         // Get wrapper
@@ -473,7 +474,7 @@ ISSUES:
                 case 27: // escape
                     if (self.showingResults_) {
                         e.preventDefault();
-                        self.deactivate(true);
+                        self.deactivate();
                         return false;
                     }
                     break;
@@ -485,80 +486,103 @@ ISSUES:
             return true;
         });
 
-        /**
-         * Events functions
-         * Use a timeout because instant blur gives race conditions
-         */
-        var onBlurFunction = function (e) {
-            if (!self.isMouseOverDropdown_ || !self.showingResults_) {
-                self.deactivate(true, true);                
-            } else {
-                // If we didn't mean to leave focus, focus back
-                setTimeout(function () {
-                    self.dom.$elem.focus();
-                }, 0);
+        var onFocusFunction = function (event) {
+            //console.log("onFocusRaw");
+            if (self.focusTimeout_) {
+                clearTimeout(self.focusTimeout_);
             }
+            
+            self.focusTimeout_ = setTimeout(function () {
+                //console.log("onFocus");
+                if (!self.showingResults_) {
+                    self.activate();
+                }
+            }, 200);                       
         };
-                
-        // BLUR event on input element
-        $elem.on('blur', function (e) {            
-            if (self.finishOnBlur_) {
-                self.finishTimeout_ = setTimeout(onBlurFunction, 200);
-            }
-        });
 
-        var focusFunction = function () {
-            // Only trigger this if focus isn't coming from autocomplete box or arrow
-            if (self.lastSelectedValue_ == null) {
-                var value = self.getValue();
-                self.lastSelectedValue_ = value;
-                self.setAcValue(self.lastSelectedValue_);
-                self.setValue('');
-                self.activate();
+        var onBlurFunction = function (event) {
+            //console.log("onBlurRaw");
+            var localIsMouseOverControlElement = self.isMouseOverControlElement_;
+            if (self.blurTimeout_) {
+                clearTimeout(self.blurTimeout_);
             }
+            self.blurTimeout_ = setTimeout(function() {
+                //console.log("onBlur", self.isMouseOverControlElement_, localIsMouseOverControlElement, self.showingResults_);
+                
+                if (self.showingResults_) {
+
+                    if (!self.isMouseOverControlElement_ && !localIsMouseOverControlElement) {
+                        //console.log("onBlur - call deactivate");
+                        self.deactivate();
+                    } else {
+                        setTimeout(function () {
+                            //console.log("onBlur - call focus");
+                            self.dom.$elem.focus();
+                        }, 0);
+                    }
+
+                } 
+                
+            }, 200);
         };
-        
-        // FOCUS event on input element        
-        $elem.on('focus', function (event) {
-            self.focusTimeout_ = setTimeout(focusFunction, 200);            
-        });
         
         var onScrollFunction = function () {
-            var $this = $(this);
-            if ($this[0].scrollHeight > $this.innerHeight() && $this.scrollTop() + $this.innerHeight() >= $this[0].scrollHeight) {
+            var $this = $(this),
+                viewHeight = $this[0].scrollHeight,
+                viewHeightCoeff = 0.6 - 10 / (viewHeight / 15 + 15);
+            /*
+            $this[0].scrollHeight = total height of the items
+            $this[0].scrollHeight > $this.innerHeight() ==== scroll bar shown
+
+
+            */
+            if (viewHeight > $this.innerHeight() && $this.scrollTop() + $this.innerHeight() >= viewHeight * viewHeightCoeff) {
                 if (self.numFetched_ !== -1) {
-                    
+
                     if (self.fetchMoreTimeout_) {
                         clearTimeout(self.fetchMoreTimeout_);
                     }
-                    self.fetchMoreTimeout_ = setTimeout(function() {
+                    self.fetchMoreTimeout_ = setTimeout(function () {
                         self.fetchData(self.lastProcessedValue_, true);
-                    }, 100);                                            
-                    
+                    }, 100);
+
                 }
             }
         };
 
+              
+        // BLUR event on input element
+        $elem.on('blur', onBlurFunction);
+        $elem.on('focus', onFocusFunction);
+
         // SCROLL event on LIST
         this.dom.$list.on('scroll', onScrollFunction);
-        
-        self.preventBlur(this.dom.$results);        
 
-        // Make sure we don't call box.click when input field was clicked
+        // Prevent triggering blur anywhere within $results box;
+        self.preventBlur(this.dom.$results);
+
+        // Make sure we don't call box.click when input field was clicked 
         this.dom.$elem.click(function (event) {
             event.stopPropagation();
         });
 
         // Attach click event for arrow
-        this.dom.$arrow.click(function (event) {            
+        this.dom.$arrow.click(function (event) {
             // Same event as down arrow on keyboard
-            if (!self.showingResults_) {        
+            //self.activate();
+            /*if (!self.showingResults_) {
                 self.dom.$elem.focus();
-            }
+            }*/
+            self.dom.$elem.focus();
             event.preventDefault();
             return false;
         });
-        
+
+        /**
+         * Events functions
+         * Use a timeout because instant blur gives race conditions
+         */
+                    
 
         /**
          * Catch a race condition on form submit
@@ -571,11 +595,11 @@ ISSUES:
     $.Autocompleter.prototype.preventBlur = function($element) {
         var self = this;
         $element.on('mouseenter', function() {
-            self.isMouseOverDropdown_ = true;
+            self.isMouseOverControlElement_ = true;
         });
 
         $element.on('mouseleave', function() {
-            self.isMouseOverDropdown_ = false;
+            self.isMouseOverControlElement_ = false;
         });
     };
     
@@ -600,14 +624,52 @@ ISSUES:
 
 
     /**
+     * Set timeout to activate autocompleter
+     */
+    $.Autocompleter.prototype.activate = function () {
+        var self = this;
+        if (this.keyTimeout_) {
+            clearTimeout(this.keyTimeout_);
+        }
+        this.keyTimeout_ = setTimeout(function () {
+            
+            if (self.lastSelectedValue_ == null) {
+                var value = self.getValue();
+                self.lastSelectedValue_ = value;
+                self.setAcValue(self.lastSelectedValue_);
+                self.setValue('');               
+            }
+            
+            self.activateNow();
+            
+        }, this.options.delay);
+    };
+
+    /**
+     * Activate autocompleter immediately
+     */
+    $.Autocompleter.prototype.activateNow = function () {
+        var self = this;
+        self.dom.$box.addClass("acActive");
+
+        var value = this.beforeUseConverter(this.dom.$elem.val());
+        if ((value !== this.lastProcessedValue_) || (this.lastKeyPressed_ === 46 || this.lastKeyPressed_ === 8)) {
+            this.fetchData(value);
+        }
+    };
+
+
+    /**
      * Position output DOM elements
      * @private
      */
     $.Autocompleter.prototype.position = function () {
         var itemsAvailable, $items;
+        
+
         // First we need to resize $results to fit desired number of items
         if (this.itemHeight_) {
-            $items = this.getItems();
+            $items = this.getItems(true);
             itemsAvailable = $items.length < this.options.maxItemsToShow ? $items.length : this.options.maxItemsToShow;
 
             this.dom.$list.height(this.itemHeight_ * itemsAvailable);
@@ -717,8 +779,10 @@ ISSUES:
      */
     $.Autocompleter.prototype.disable = function () {
         /*if (this.showingResults_) {*/
-            this.deactivate(true);
+            
         //}
+        
+        this.deactivate();
         
         this.dom.$box.addClass("acDisabled");
         
@@ -786,31 +850,7 @@ ISSUES:
             return f(data, this);
         }
         return false;
-    };
-    
-    /**
-     * Set timeout to activate autocompleter
-     */
-    $.Autocompleter.prototype.activate = function() {
-        var self = this;
-        if (this.keyTimeout_) {
-            clearTimeout(this.keyTimeout_);
-        }
-        this.keyTimeout_ = setTimeout(function() {
-            self.activateNow();
-            self.dom.$box.addClass("acActive");
-        }, this.options.delay);
-    };
-
-    /**
-     * Activate autocompleter immediately
-     */
-    $.Autocompleter.prototype.activateNow = function() {
-        var value = this.beforeUseConverter(this.dom.$elem.val());
-        if ((value !== this.lastProcessedValue_) || (this.lastKeyPressed_ === 46 || this.lastKeyPressed_ === 8)) {
-            this.fetchData(value);
-        }
-    };
+    };   
 
     /**
      * Get autocomplete data for a given value
@@ -907,7 +947,7 @@ ISSUES:
      * @param {string} value Parameter value
      * @public
      */
-    $.Autocompleter.prototype.setExtraParam = function(name, value) {
+    $.Autocompleter.prototype.setExtraParam = function (name, value) {
         var index = $.trim(String(name));
         if (index) {
             if (!this.options.extraParams) {
@@ -1137,11 +1177,27 @@ ISSUES:
      * Get all items from the results list
      * @param result
      */
-    $.Autocompleter.prototype.getItems = function () {
-        if (!this.$itemsCache_) {
-            this.$itemsCache_ = $('>ul>li', this.dom.$results);
+    $.Autocompleter.prototype.getItems = function (allItems) {
+        var itemsCache = this.$itemsCache_;
+        if (!itemsCache) {
+            itemsCache = {};
         }
-        return this.$itemsCache_;        
+
+        var results;
+        if (allItems) {
+            if (!itemsCache.all) {
+                itemsCache.all = $('>ul>li', this.dom.$results);
+            }
+            results = itemsCache.all;
+        } else {
+            if (!itemsCache.selecable) {
+                itemsCache.selecable = $('>ul>li', this.dom.$results).not(".acNoSelect");;
+
+            }
+            results = itemsCache.selecable;
+        }
+
+        return results;
     };
 
     /**
@@ -1165,7 +1221,7 @@ ISSUES:
             for (i = 0; i < numResults; i++) {
                 result = results[i];
                 $li = this.createItemFromResult(result);
-                this.dom.$list.append($li);               
+                this.dom.$list.append($li);
 
                 if (!append) {
                     if (first === false) {
@@ -1178,51 +1234,59 @@ ISSUES:
                     }
                 }
             }
-          
-            this.dom.$results.show();
-            
-            if (this.dom.$extra) {
-                this.dom.$extra.show();
-            }
-            
-            // Fix for FF that scrolls the list to the bottom after creation
+        } else {            
             if (!append) {
-                setTimeout(function () {
-                    self.dom.$list.scrollTop(0);
-                }, 0);                
+                $li = this.createItemFromNoResult();
+                this.dom.$list.append($li);
+                this.setAcValue('');
             }
-            
-            // grab height of one item
-            if (!self.itemHeight_) {
-                self.itemHeight_ = $first.outerHeight();
-            }
-
-            // Always recalculate position since window size or
-            // input element location may have changed.
-            this.position();
-                
-            var items = this.getItems();
-            
-            // unbind events from existing items
-            if (append) {
-                items.unbind('mouseenter mouseleave');
-            }
-
-            this.getItems().hover(
-                function() { self.focusItem(this); },
-                function() { /* void */ }
-            );
-            if (!append) {
-                if (this.autoFill(first, filter) || this.options.selectFirst || (this.options.selectOnly && numResults === 1)) {
-                    this.focusItem($first);
-                }
-                this.showingResults_ = true;
-            }
-        } else {
-            this.hideResults();
-            this.showingResults_ = false;
-            this.setAcValue('');
         }
+
+        this.dom.$results.show();
+            
+        if (this.dom.$extra) {
+            this.dom.$extra.show();
+        }
+            
+        // Fix for FF that scrolls the list to the bottom after creation
+        if (!append) {
+            setTimeout(function () {
+                self.dom.$list.scrollTop(0);
+            }, 0);                
+        }
+            
+        // grab height of one item
+        if (!self.itemHeight_) {
+            self.itemHeight_ = $first.outerHeight();
+        }
+
+        // Always recalculate position since window size or
+        // input element location may have changed.
+        this.position();
+                
+        var items = this.getItems();
+            
+        // unbind events from existing items
+        if (append) {
+            items.unbind('mouseenter mouseleave');
+        }
+
+        items.hover(
+            function() { self.focusItem(this); },
+            function() { /* void */ }
+        );
+        
+        if (!append) {
+            if (numResults && (this.autoFill(first, filter) || this.options.selectFirst || (this.options.selectOnly && numResults === 1))) {
+                this.focusItem($first);
+            }
+            this.showingResults_ = true;
+        }       
+    };
+
+    $.Autocompleter.prototype.createItemFromNoResult = function () {
+        var $li = $('<li></li>').text(this.options.noMatchMessage).addClass("acNoSelect");
+        return $li;
     };
 
     $.Autocompleter.prototype.showResult = function(value, data) {
@@ -1352,7 +1416,7 @@ ISSUES:
         if ($item.length === 1) {
             this.selectItem($item, skipFocus);
         } else {
-            this.deactivate(true);
+            this.deactivate();
         }
     };
 
@@ -1383,7 +1447,7 @@ ISSUES:
         this.setValue(displayValue);
         this.setAcValue("");
         this.callHook('onItemSelect', { value: value, data: data });
-        this.deactivate(true);
+        this.deactivate();
         /*if (!skipFocus) {
             this.setCaret(d.start + displayValue.length + extraCaretPos);
             elem.focus();
@@ -1402,11 +1466,12 @@ ISSUES:
         if (this.dom.$extra) {
             this.dom.$extra.hide();
         }
+        this.showingResults_ = false;
     };
 
-    $.Autocompleter.prototype.deactivate = function(finish, skipBlur) {
-        if (this.finishTimeout_) {
-            clearTimeout(this.finishTimeout_);
+    $.Autocompleter.prototype.deactivate = function(skipBlur) {
+        if (this.blurTimeout_) {
+            clearTimeout(this.blurTimeout_);
         }
         if (this.keyTimeout_) {
             clearTimeout(this.keyTimeout_);
@@ -1415,29 +1480,34 @@ ISSUES:
         if (this.focusTimeout_) {
             clearTimeout(this.focusTimeout_);
         }
-        if (finish) {
-            if (this.lastProcessedValue_ !== this.lastSelectedValue_) {
-                if (this.options.mustMatch) {
-                    if (this.lastSelectedValue_ != null && this.lastSelectedValue_.length > 0) {
-                        this.setValue(this.lastSelectedValue_);
-                    } else {
-                        this.setValue('');
-                    }
+
+        // Select value
+        if (this.lastProcessedValue_ !== this.lastSelectedValue_) {
+            if (this.options.mustMatch) {
+                if (this.lastSelectedValue_ != null && this.lastSelectedValue_.length > 0) {
+                    this.setValue(this.lastSelectedValue_);
+                } else {
+                    this.setValue('');
                 }
-                this.callHook('onNoMatch');
             }
-            if (this.showingResults_) {
-                this.callHook('onFinish');
-            }            
-            this.lastKeyPressed_ = null;
-            this.lastProcessedValue_ = null;
-            this.lastSelectedValue_ = null;
-            this.showingResults_ = false;
+            this.callHook('onNoMatch');
         }
+        if (this.showingResults_) {
+            this.callHook('onFinish');
+        }
+        
+        this.lastKeyPressed_ = null;
+        this.lastProcessedValue_ = null;
+        this.lastSelectedValue_ = null;
+        
         this.setAcValue('');
         this.hideResults();
         this.dom.$box.removeClass("acActive");
-        if (!skipBlur) this.dom.$elem.blur();
+        
+        // blur
+        //if (!skipBlur) 
+        // Leave the field
+        this.dom.$elem.blur();
     };
 
     $.Autocompleter.prototype.selectRange = function(start, end) {
