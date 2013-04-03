@@ -1,7 +1,7 @@
 /**
  * @fileOverview jquery-autocomplete, the jQuery Autocompleter
  * @author <a href="mailto:dylan@dyve.net">Dylan Verheul</a>
- * @version 2.4.3
+ * @version 2.4.4
  * @requires jQuery 1.6+
  * @license MIT | GPL | Apache 2.0, see LICENSE.txt
  * @see https://github.com/dyve/jquery-autocomplete
@@ -1167,7 +1167,8 @@ ISSUES:
      */
     $.Autocompleter.prototype.createItemFromResult = function(result) {
         var self = this;
-        var $li = $('<li>' + this.showResult(result.value, result.data) + '</li>');
+        var $li = $('<li/>');
+        $li.text(this.showResult(result.value, result.data));
         $li.data({value: result.value, data: result.data})
             .click(function() {
                 self.selectItem($li);
@@ -1573,7 +1574,7 @@ ISSUES:
         return {
             start: start,
             end: end
-        };        
+        };
     };
 
     /**
