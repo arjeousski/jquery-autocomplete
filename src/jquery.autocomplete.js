@@ -1,7 +1,7 @@
 /**
  * @fileOverview jquery-autocomplete, the jQuery Autocompleter
  * @author <a href="mailto:dylan@dyve.net">Dylan Verheul</a>
- * @version 2.4.0
+ * @version 2.4.3
  * @requires jQuery 1.6+
  * @license MIT | GPL | Apache 2.0, see LICENSE.txt
  * @see https://github.com/dyve/jquery-autocomplete
@@ -484,6 +484,13 @@ ISSUES:
 
             }
             return true;
+        });
+
+        /**
+         * Attach paste event listener because paste may occur much later then keydown or even without a keydown at all
+         */
+        $elem.on('paste', function() {
+            self.activate();
         });
 
         var onFocusFunction = function (event) {
@@ -1534,36 +1541,38 @@ ISSUES:
      * Get caret position
      */
     $.Autocompleter.prototype.getCaret = function() {
-        var elem = this.dom.$elem;
-        var s, e;
-        if (!$.support.cssFloat) {
-            // ie
-            var selection = document.selection;
-            var range;
-            if (elem[0].tagName.toLowerCase() !== 'textarea') {
-                var val = elem.val();
+        var $elem = this.dom.$elem;
+        var elem = $elem[0];
+        var val, selection, range, start, end, stored_range;
+        if (elem.createTextRange) { // IE
+            selection = document.selection;
+            if (elem.tagName.toLowerCase() != 'textarea') {
+                val = $elem.val();
                 range = selection.createRange().duplicate();
                 range.moveEnd('character', val.length);
-                s = ( range.text === '' ? val.length : val.lastIndexOf(range.text) );
+                if (range.text === '') {
+                    start = val.length;
+                } else {
+                    start = val.lastIndexOf(range.text);
+                }
                 range = selection.createRange().duplicate();
                 range.moveStart('character', -val.length);
-                e = range.text.length;
+                end = range.text.length;
             } else {
                 range = selection.createRange();
-                var stored_range = range.duplicate();
-                stored_range.moveToElementText(elem[0]);
+                stored_range = range.duplicate();
+                stored_range.moveToElementText(elem);
                 stored_range.setEndPoint('EndToEnd', range);
-                s = stored_range.text.length - range.text.length;
-                e = s + range.text.length;
+                start = stored_range.text.length - range.text.length;
+                end = start + range.text.length;
             }
         } else {
-            // ff, chrome, safari
-            s = elem[0].selectionStart;
-            e = elem[0].selectionEnd;
+            start = $elem[0].selectionStart;
+            end = $elem[0].selectionEnd;
         }
         return {
-            start: s,
-            end: e
+            start: start,
+            end: end
         };        
     };
 
