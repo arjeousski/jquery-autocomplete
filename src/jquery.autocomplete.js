@@ -1129,15 +1129,13 @@ ISSUES:
 
     /**
      * Convert string before use
-     * @param s
-     * @param a
-     * @param b
+     * @param {String} s
      */
-    $.Autocompleter.prototype.beforeUseConverter = function(s, a, b) {
-        s = this.getValue();
+    $.Autocompleter.prototype.beforeUseConverter = function(s) {
+        s = this.getValue(s);
         var converter = this.options.beforeUseConverter;
         if ($.isFunction(converter)) {
-            s = converter(s, a, b);
+            s = converter(s);
         }
         return s;
     };
@@ -1606,13 +1604,12 @@ ISSUES:
      * Get the value currently being autocompleted
      * @param {String} value
      */
-    $.Autocompleter.prototype.getValue = function() {
-        var val = this.dom.$elem.val();
+    $.Autocompleter.prototype.getValue = function(value) {
         if ( this.options.useDelimiter ) {
             var d = this.getDelimiterOffsets();
-            return val.substring(d.start, d.end).trim();
+            return value.substring(d.start, d.end).trim();
         } else {
-            return val;
+            return value;
         }
     };
 
