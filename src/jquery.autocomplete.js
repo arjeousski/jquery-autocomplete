@@ -883,7 +883,7 @@ ISSUES:
                 self.numFetched_ = -1;
             }           
 
-            self.showResults(self.filterResults(results, filter), filter, append);
+            self.showResults(self.filterResults(results, filter), filter, append, results === false);
         };
         if (!fetchNext) {
             this.lastProcessedValue_ = value;
@@ -1213,7 +1213,7 @@ ISSUES:
      * @param results
      * @param filter
      */
-    $.Autocompleter.prototype.showResults = function(results, filter, append) {
+    $.Autocompleter.prototype.showResults = function(results, filter, append, isError) {
         var numResults = results.length;
         var self = this;
         
@@ -1243,9 +1243,10 @@ ISSUES:
                 }
             }
         } else {            
-            if (!append) {
-                $li = this.createItemFromNoResult();
+            if (!append) {                
+                $li = this.createItemFromNoResult(isError ? "Error retreiving locations." : null);
                 this.dom.$list.append($li);
+                $first = $li;
                 this.setAcValue('');
             }
         }
@@ -1292,8 +1293,9 @@ ISSUES:
         }       
     };
 
-    $.Autocompleter.prototype.createItemFromNoResult = function () {
-        var $li = $('<li></li>').text(this.options.noMatchMessage).addClass("acNoSelect");
+    $.Autocompleter.prototype.createItemFromNoResult = function (message) {
+        var messageToDisplay = message || this.options.noMatchMessage;
+        var $li = $('<li></li>').text(messageToDisplay).addClass("acNoSelect");
         return $li;
     };
 
