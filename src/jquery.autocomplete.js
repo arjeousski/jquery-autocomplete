@@ -380,7 +380,7 @@ ISSUES:
         this.dom.$results = $('<div></div>').hide().addClass(this.options.resultsClass).css({
             position: 'absolute'
         });
-        $('body').append(this.dom.$results);
+        $elem.parent().parent().parent().append(this.dom.$results);
 
         this.dom.$list = $('<ul></ul>');
         this.dom.$results.append(this.dom.$list);
@@ -625,7 +625,7 @@ ISSUES:
 
         this.dom.$extra.append($float);
 
-        $('body').append(this.dom.$extra);
+        this.dom.$elem.parent().parent().parent().append(this.dom.$extra);
         
     };
 
@@ -682,7 +682,7 @@ ISSUES:
             this.dom.$list.height(this.itemHeight_ * itemsAvailable);
         }
 
-        var offset = this.dom.$box.offset();
+        var offset = this.dom.$box.position();
         var height = this.dom.$results.outerHeight();
         var totalHeight = $(window).outerHeight();
         var inputBottom = offset.top + this.dom.$box.outerHeight();
