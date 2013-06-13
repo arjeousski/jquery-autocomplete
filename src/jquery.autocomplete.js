@@ -320,6 +320,7 @@ ISSUES:
         
         // This is set to true when we are scrolling so that we ignore hover events (if mouse is over the list)
         this.isScrolling = false;
+        this.scrollingTimer = null;
 
         /**
          * Sanitize options
@@ -1285,8 +1286,9 @@ ISSUES:
         }
 
         items.hover(
-            function() {
-                if (!this.isScrolling) {
+            function () {
+                console.log("hover: " + self.isScrolling);
+                if (self.isScrolling === false) {
                     self.focusItem(this);
                 } 
             },
@@ -1406,14 +1408,14 @@ ISSUES:
      */
     $.Autocompleter.prototype.scrollItemIntoView = function ($item) {
         var itemHeight = $item.outerHeight(),
-			dropdown = this.dom.$list,
-			dropdownHeight = dropdown.innerHeight(),
-			scrollPos = dropdown.scrollTop(),
-			itemTop = ($item.position() || {}).top,
-			scrollTo = null,
-			paddingTop = parseInt(dropdown.css('paddingTop'))
-        ;
-
+            dropdown = this.dom.$list,
+            dropdownHeight = dropdown.innerHeight(),
+            scrollPos = dropdown.scrollTop(),
+            itemTop = ($item.position() || {}).top,
+            scrollTo = null,
+            paddingTop = parseInt(dropdown.css('paddingTop')),
+            self = this;
+        
         if (itemTop == null)
             return;
 
@@ -1428,7 +1430,14 @@ ISSUES:
         if (scrollTo != null) {
             this.isScrolling = true;
             dropdown.scrollTop(scrollTo);
-            this.isScrolling = false;
+            
+            // Allow hovers to be handled 100ms after scrolling
+            if (this.scrollingTimer) clearTimeout(this.scrollingTimer);
+            this.scrollingTimer = setTimeout(function () {
+                console.log("reset scrolling");
+                self.isScrolling = false;
+            }, 100);
+            console.log("done scrolling");
         }
     };
 
