@@ -971,6 +971,8 @@ ISSUES:
                 }
             }
         }
+
+        return this;
     };
 
     /**
@@ -1172,7 +1174,7 @@ ISSUES:
     $.Autocompleter.prototype.createItemFromResult = function(result) {
         var self = this;
         var $li = $('<li/>');
-        $li.text(this.showResult(result.value, result.data));
+        $li.html(this.showResult(result.value, result.data));
         $li.data({value: result.value, data: result.data})
             .click(function() {
                 self.selectItem($li);
@@ -1309,7 +1311,7 @@ ISSUES:
         if ($.isFunction(this.options.showResult)) {
             return this.options.showResult(value, data);
         } else {
-            return value;
+            return $('<p></p>').text(value).html();
         }
     };
 
