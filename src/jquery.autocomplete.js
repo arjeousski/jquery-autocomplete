@@ -315,9 +315,11 @@ ISSUES:
          * @property {int} number of records fetched so far
          * @private
          */
-        this.numFetched_ = null;
-        
+        this.numFetched_ = null;        
         this.isMouseOverControlElement_ = null;
+        
+        // This is set to true when we are scrolling so that we ignore hover events (if mouse is over the list)
+        this.isScrolling = false;
 
         /**
          * Sanitize options
@@ -1281,7 +1283,11 @@ ISSUES:
         }
 
         items.hover(
-            function() { self.focusItem(this); },
+            function() {
+                if (!this.isScrolling) {
+                    self.focusItem(this);
+                } 
+            },
             function() { /* void */ }
         );
         
@@ -1417,8 +1423,11 @@ ISSUES:
         if (itemTop < 0)
             scrollTo = itemTop + scrollPos - paddingTop;
 
-        if (scrollTo != null)
+        if (scrollTo != null) {
+            this.isScrolling = true;
             dropdown.scrollTop(scrollTo);
+            this.isScrolling = false;
+        }
     };
 
     $.Autocompleter.prototype.selectCurrent = function(skipFocus) {
