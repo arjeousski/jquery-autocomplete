@@ -1287,7 +1287,6 @@ ISSUES:
 
         items.hover(
             function () {
-                console.log("hover: " + self.isScrolling);
                 if (self.isScrolling === false) {
                     self.focusItem(this);
                 } 
@@ -1434,10 +1433,8 @@ ISSUES:
             // Allow hovers to be handled 100ms after scrolling
             if (this.scrollingTimer) clearTimeout(this.scrollingTimer);
             this.scrollingTimer = setTimeout(function () {
-                console.log("reset scrolling");
                 self.isScrolling = false;
             }, 100);
-            console.log("done scrolling");
         }
     };
 
