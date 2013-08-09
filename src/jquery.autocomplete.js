@@ -554,9 +554,37 @@ ISSUES:
                     }
                     self.fetchMoreTimeout_ = setTimeout(function () {
                         self.fetchData(self.lastProcessedValue_, true);
-                    }, 100);
+                    }, 0);
 
                 }
+            }
+        };
+
+        var scrollFreezeFunction = function(ev) {
+            var $this = $(this),
+                scrollTop = this.scrollTop,
+                scrollHeight = this.scrollHeight,
+                height = $this.height(),
+                delta = (ev.type == 'DOMMouseScroll' ?
+                    ev.originalEvent.detail * -40 :
+                    ev.originalEvent.wheelDelta),
+                up = delta > 0;
+
+            var prevent = function() {
+                ev.stopPropagation();
+                ev.preventDefault();
+                ev.returnValue = false;
+                return false;
+            }
+
+            if (!up && -delta > scrollHeight - height - scrollTop) {
+                // Scrolling down, but this will take us past the bottom.
+                $this.scrollTop(scrollHeight);
+                return prevent();
+            } else if (up && delta > scrollTop) {
+                // Scrolling up, but this will take us past the top.
+                $this.scrollTop(0);
+                return prevent();
             }
         };
 
@@ -567,6 +595,8 @@ ISSUES:
 
         // SCROLL event on LIST
         this.dom.$list.on('scroll', onScrollFunction);
+        this.dom.$list.on('DOMMouseScroll mousewheel', scrollFreezeFunction);
+        
 
         // Prevent triggering blur anywhere within $results box;
         self.preventBlur(this.dom.$results);
@@ -883,7 +913,9 @@ ISSUES:
                 self.numFetched_ += results.length;
             } else {
                 // We got less records than we've asked
-                self.numFetched_ = -1;
+                if (results !== false) {
+                    self.numFetched_ = -1;
+                }
             }           
 
             self.showResults(self.filterResults(results, filter), filter, append, results === false);
