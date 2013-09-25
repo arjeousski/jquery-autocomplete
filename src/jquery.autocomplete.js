@@ -309,6 +309,7 @@ ISSUES:
          * @private
          */
         this.fetchRemoteRequest_ = null;
+        self.fetchRemoteRequestUrl_ = null;
         
 
         /**
@@ -349,7 +350,7 @@ ISSUES:
         /**
          * Switch off the native autocomplete and add the input class
          */
-        this.dom.$elem.attr('autocomplete', 'off').addClass(this.options.inputClass);
+        this.dom.$elem.attr('autocomplete', 'off').attr('autocorrect', 'off').attr('autocapitalize', 'none').attr('spellcheck', 'false').addClass(this.options.inputClass);
         
         // Clone input element
         this.dom.$acelem = this.dom.$elem.clone().attr({ 'id': '', 'disabled': 'disabled' }).addClass(this.options.inputAcClass);
@@ -489,6 +490,10 @@ ISSUES:
             return true;
         });
 
+        $elem.on('change', function () {
+            self.activate();
+        });
+
         /**
          * Attach paste event listener because paste may occur much later then keydown or even without a keydown at all
          */
@@ -547,16 +552,14 @@ ISSUES:
 
             */
             if (viewHeight > $this.innerHeight() && $this.scrollTop() + $this.innerHeight() >= viewHeight * viewHeightCoeff) {
-                if (self.numFetched_ !== -1) {
-
-                    if (self.fetchMoreTimeout_) {
-                        clearTimeout(self.fetchMoreTimeout_);
-                    }
-                    self.fetchMoreTimeout_ = setTimeout(function () {
-                        self.fetchData(self.lastProcessedValue_, true);
-                    }, 0);
-
+                if (self.fetchMoreTimeout_) {
+                    clearTimeout(self.fetchMoreTimeout_);
                 }
+                self.fetchMoreTimeout_ = setTimeout(function () {
+                    if (self.numFetched_ !== -1) {
+                        self.fetchData(self.lastProcessedValue_, true);
+                    }
+                }, 100);                
             }
         };
 
@@ -942,11 +945,16 @@ ISSUES:
      * @private
      */
     $.Autocompleter.prototype.fetchRemoteData = function (filter, fetchNext, callback) {
+        var self = this;
+
+        // We want to make sure not to sumbmit any requests where skip=-1
+        if (self.numFetched_ === -1) return;
+
         var data = this.cacheRead(filter);
         if (data) {
             callback(data);
         } else {
-            var self = this;
+            
             var dataType = self.options.remoteDataType === 'json' ? 'json' : 'text';
             var ajaxCallback = function(data) {
                 var parsed = false;
@@ -958,25 +966,36 @@ ISSUES:
                 callback(parsed, fetchNext);
             };
             this.dom.$elem.addClass(this.options.loadingClass);
-            
-            // Cancel previous request
+
+            var fetchUrl = this.makeUrl(filter, fetchNext);
+
+            // Cancel previous request (only if its different than current request)
             if (this.fetchRemoteRequest_) {
-                this.fetchRemoteRequest_.abort();
-                this.fetchRemoteRequest_ = null;
+                if (fetchUrl !== this.fetchRemoteRequestUrl_) {
+                    this.fetchRemoteRequest_.abort();
+                    this.fetchRemoteRequest_ = null;
+                } else {
+                    return;
+                }
             }
-            
+
+            this.fetchRemoteRequestUrl_ = fetchUrl;
             this.fetchRemoteRequest_ = $.ajax({
-                url: this.makeUrl(filter, fetchNext),
+                url: fetchUrl,
                 success: ajaxCallback,
-                error: function(jqXHR, textStatus, errorThrown) {
+                error: function (jqXHR, textStatus, errorThrown) {
                     if($.isFunction(self.options.onError)) {
                         self.options.onError(jqXHR, textStatus, errorThrown);
                     } else {
-                      ajaxCallback(false);
+                        if (textStatus !== "abort") // null here means it was aborted and no new request has been issued
+                        {
+                            ajaxCallback(false);
+                        }
                     }
                 },
                 complete: function() {
                     self.fetchRemoteRequest_ = null;
+                    self.fetchRemoteRequestUrl_ = null;
                 },
                 dataType: dataType
             });
@@ -1355,21 +1374,27 @@ ISSUES:
             lcValue = String(value).toLowerCase();
             lcFilter = String(filter).toLowerCase();
             filterLength = filter.length;
-            if (filterLength > 0 && lcValue.substr(0, filterLength) === lcFilter) {
-                // NOTE: Delimiter is not handled)
-                this.lastProcessedValue_ = value.substr(0, filterLength);
-                this.setValue(this.lastProcessedValue_);
-                this.setAcValue(value);
-                //this.selectRange(start, end);
-                return true;
-            } else {
-                if (filterLength == 0) {
-                    this.setAcValue(this.lastSelectedValue_);
-                } else {
-                    this.setAcValue('');
-                }
-            }
-        }
+           if (filterLength > 0) {
+               if (lcValue.substr(0, filterLength) === lcFilter) {
+                   // NOTE: Delimiter is not handled)
+
+                   this.lastProcessedValue_ = value.substr(0, filterLength);
+
+                   // We only set the value if case needs to be changed
+                   if (value.substr(0, filterLength) !== filter) {
+                       this.setValue(this.lastProcessedValue_);
+                   }
+
+                   this.setAcValue(value);
+               } else {
+                   this.setAcValue('');
+               }
+               return true;
+           } else {               
+               // filterLength == 0
+               this.setAcValue(this.lastSelectedValue_);
+           }
+       }
         return false;
     };
     
@@ -1634,7 +1659,7 @@ ISSUES:
      * Set the value that is currently being autocompleted
      * @param {String} value
      */
-    $.Autocompleter.prototype.setValue = function(value) {
+    $.Autocompleter.prototype.setValue = function (value) {
         if ( this.options.useDelimiter ) {
             // set the substring between the current delimiters
             var val = this.dom.$elem.val();
