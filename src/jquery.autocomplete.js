@@ -21,6 +21,8 @@ ISSUES:
      * @returns (object} jQuery object
      */
     $.fn.autocomplete = function(options) {
+        /*
+        REMOVED: URL is no longer passed as options, its now constructed using a function
         var url;
         if (arguments.length > 1) {
             url = options;
@@ -29,7 +31,7 @@ ISSUES:
         } else if (typeof options === 'string') {
             url = options;
             options = { url: url };
-        }
+        }*/
         // Do a deep copy so that new extraParams object is created
         var opts = $.extend(true, {}, $.fn.autocomplete.defaults, options);
         return this.each(function() {
@@ -53,8 +55,6 @@ ISSUES:
         resultsClass: 'acResults',
         selectClass: 'acSelect',
         noMatchMessage: 'No items found',
-        queryParamName: 'q',
-        extraParams: {},
         remoteDataType: false,
         lineSeparator: '\n',
         cellSeparator: '|',
@@ -88,11 +88,48 @@ ISSUES:
         delimiterKeyCode: 188,
         processData: null,
         onError: null,
-        limitParam: null,
-        skipParam: null,
         numLoadInitial: 10,
-        numLoadSubsequent: 100
+        numLoadSubsequent: 100,
+        onBuildUrl: function(query, skip, limit) {}
     };
+
+    /**
+     * 
+     */
+    var deepObjectCompare = function (x, y) {
+        if (x === y) return true;
+        // if both x and y are null or undefined and exactly the same
+
+        if (!(x instanceof Object) || !(y instanceof Object)) return false;
+        // if they are not strictly equal, they both need to be Objects
+
+        if (x.constructor !== y.constructor) return false;
+        // they must have the exact same prototype chain, the closest we can do is
+        // test there constructor.
+
+        for (var p in x) {
+            if (!x.hasOwnProperty(p)) continue;
+            // other properties were tested using x.constructor === y.constructor
+
+            if (!y.hasOwnProperty(p)) return false;
+            // allows to compare x[ p ] and y[ p ] when set to undefined
+
+            if (x[p] === y[p]) continue;
+            // if they have the same strict value or identity then they are equal
+
+            if (typeof (x[p]) !== "object") return false;
+            // Numbers, Strings, Functions, Booleans must be strictly equal
+
+            if (!Object.equals(x[p], y[p])) return false;
+            // Objects and Arrays must be tested recursively
+        }
+
+        for (p in y) {
+            if (y.hasOwnProperty(p) && !x.hasOwnProperty(p)) return false;
+            // allows x[ p ] to be set to undefined
+        }
+        return true;
+    }
 
     /**
      * Sanitize result
@@ -309,7 +346,7 @@ ISSUES:
          * @private
          */
         this.fetchRemoteRequest_ = null;
-        self.fetchRemoteRequestUrl_ = null;
+        this.fetchRemoteRequestUrl_ = null;
         
 
         /**
@@ -946,6 +983,8 @@ ISSUES:
      */
     $.Autocompleter.prototype.fetchRemoteData = function (filter, fetchNext, callback) {
         var self = this;
+        var limit = this.options.numLoadInitial,
+            skip = 0;
 
         // We want to make sure not to sumbmit any requests where skip=-1
         if (self.numFetched_ === -1) return;
@@ -967,11 +1006,17 @@ ISSUES:
             };
             this.dom.$elem.addClass(this.options.loadingClass);
 
-            var fetchUrl = this.makeUrl(filter, fetchNext);
-
+            // Figure out limits
+            if (fetchNext) {
+                limit = this.options.numLoadSubsequent;
+                skip = this.numFetched_;
+            } 
+            
+            var urlData = this.options.onBuildUrl(filter, skip, limit);
+            
             // Cancel previous request (only if its different than current request)
             if (this.fetchRemoteRequest_) {
-                if (fetchUrl !== this.fetchRemoteRequestUrl_) {
+                if (!(deepObjectCompare(urlData,this.fetchRemoteRequestData_))) {
                     this.fetchRemoteRequest_.abort();
                     this.fetchRemoteRequest_ = null;
                 } else {
@@ -979,9 +1024,11 @@ ISSUES:
                 }
             }
 
-            this.fetchRemoteRequestUrl_ = fetchUrl;
+            this.fetchRemoteRequestData_ = urlData;
             this.fetchRemoteRequest_ = $.ajax({
-                url: fetchUrl,
+                url: urlData.url,
+                method: urlData.method || "GET",
+                data: urlData.params,
                 success: ajaxCallback,
                 error: function (jqXHR, textStatus, errorThrown) {
                     if($.isFunction(self.options.onError)) {
@@ -1033,6 +1080,7 @@ ISSUES:
      * @param {string} param The value parameter to pass to the backend
      * @returns {string} The finished url with parameters
      */
+    /*
     $.Autocompleter.prototype.makeUrl = function(param, fetchNext) {
         var self = this;
         var url = this.options.url;
@@ -1047,6 +1095,8 @@ ISSUES:
                 limitParams[this.options.skipParam] = 0;
             }
         }
+
+        this.options.onBuildUrl(param,)
     
         var params = $.extend({}, this.options.extraParams, limitParams);
 
@@ -1055,9 +1105,10 @@ ISSUES:
         } else {
             params[this.options.queryParamName] = param;
         }
+        //this.options.generateUrl(param, )
 
         return makeUrl(url, params);
-    };
+    };*/
 
     /**
      * Parse data received from server
