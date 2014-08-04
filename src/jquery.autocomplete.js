@@ -646,25 +646,7 @@ ISSUES:
         });
     };
     
-    
-    /**
-     * Set Extra Box Element
-     * @public
-     */
-    $.Autocompleter.prototype.setFloat = function ($float) {
-        var self = this;
-        this.dom.$extra = $('<div></div>', {"class": this.options.resultsClass + " acResultsFloat"}).hide().css({
-            position: 'absolute', top: 0
-        });
-
-        self.preventBlur(this.dom.$extra);
-
-        this.dom.$extra.append($float);
-
-        this.dom.$elem.parent().parent().parent().append(this.dom.$extra);
-        
-    };
-
+  
 
     /**
      * Set timeout to activate autocompleter
@@ -734,24 +716,11 @@ ISSUES:
         }
         this.dom.$results.css(position);
 
-        if (this.dom.$extra) {
-            var extraHeight = this.dom.$extra.outerHeight();
-            var extraPosition = { top: inputBottom + height, left: offset.left };
-
-            this.dom.$extra.css(extraPosition);
-        }
-
         if (this.options.autoWidth) {
             var autoWidth = this.dom.$box.outerWidth() - this.dom.$results.outerWidth() + this.dom.$results.width();
             //this.dom.$results.css(this.options.autoWidth, autoWidth);
             $('>ul', this.dom.$results).css(this.options.autoWidth, autoWidth); // AR - IE7 - set correct width on the list too otherwise scrollbar is in the middle of div
-            
-            if (this.dom.$extra) {
-                // We need to calculate it again because it may have padding
-                autoWidth = this.dom.$box.outerWidth() - this.dom.$extra.outerWidth() + this.dom.$extra.width();
-                this.dom.$extra.css(this.options.autoWidth, autoWidth);
-            }
-        }
+         }
     };
 
     /**
@@ -815,7 +784,6 @@ ISSUES:
     $.Autocompleter.prototype.cleanDOM = function () {
         this.dom.$box.remove();
         this.dom.$results.remove();
-        this.dom.$extra.remove();
     };
 
     /**
@@ -1211,10 +1179,7 @@ ISSUES:
         }
 
         this.dom.$results.show();
-            
-        if (this.dom.$extra) {
-            this.dom.$extra.show();
-        }
+           
             
         // Fix for FF that scrolls the list to the bottom after creation
         if (!append) {
@@ -1443,9 +1408,6 @@ ISSUES:
 
     $.Autocompleter.prototype.hideResults = function() {
         this.dom.$results.hide();
-        if (this.dom.$extra) {
-            this.dom.$extra.hide();
-        }
         this.showingResults_ = false;
     };
 
