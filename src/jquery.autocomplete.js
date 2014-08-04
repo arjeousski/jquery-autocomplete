@@ -61,8 +61,6 @@ ISSUES:
         minChars: 2,
         maxItemsToShow: 10, // This now defines how many items to be shown in the dropdown
         delay: 400,
-        useCache: true,
-        maxCacheLength: 10,
         matchSubset: true,
         matchCase: false,
         matchInside: true,
@@ -256,18 +254,6 @@ ISSUES:
         this.options = options;
 
         /**
-         * @property object Cached data for this instance
-         * @private
-         */
-        this.cacheData_ = {};
-
-        /**
-         * @property {number} Number of cached data items
-         * @private
-         */
-        this.cacheLength_ = 0;
-
-        /**
          * @property {string} Class name to mark selected item
          * @private
          */
@@ -341,7 +327,6 @@ ISSUES:
          */
         this.options.minChars = sanitizeInteger(this.options.minChars, $.fn.autocomplete.defaults.minChars, { min: 0 });
         this.options.maxItemsToShow = sanitizeInteger(this.options.maxItemsToShow, $.fn.autocomplete.defaults.maxItemsToShow, { min: 0 });
-        this.options.maxCacheLength = sanitizeInteger(this.options.maxCacheLength, $.fn.autocomplete.defaults.maxCacheLength, { min: 1 });
         this.options.delay = sanitizeInteger(this.options.delay, $.fn.autocomplete.defaults.delay, { min: 0 });
         if (this.options.preventDefaultReturn !== 2) {
             this.options.preventDefaultReturn = this.options.preventDefaultReturn ? 1 : 0;
@@ -768,68 +753,6 @@ ISSUES:
     };
 
     /**
-     * Read from cache
-     * @private
-     */
-    $.Autocompleter.prototype.cacheRead = function(filter) {
-        var filterLength, searchLength, search, maxPos, pos;
-        if (this.options.useCache) {
-            filter = String(filter);
-            filterLength = filter.length;
-            if (this.options.matchSubset) {
-                searchLength = 1;
-            } else {
-                searchLength = filterLength;
-            }
-            while (searchLength <= filterLength) {
-                if (this.options.matchInside) {
-                    maxPos = filterLength - searchLength;
-                } else {
-                    maxPos = 0;
-                }
-                pos = 0;
-                while (pos <= maxPos) {
-                    search = filter.substr(0, searchLength);
-                    if (this.cacheData_[search] !== undefined) {
-                        return this.cacheData_[search];
-                    }
-                    pos++;
-                }
-                searchLength++;
-            }
-        }
-        return false;
-    };
-
-    /**
-     * Write to cache
-     * @private
-     */
-    $.Autocompleter.prototype.cacheWrite = function(filter, data) {
-        if (this.options.useCache) {
-            if (this.cacheLength_ >= this.options.maxCacheLength) {
-                this.cacheFlush();
-            }
-            filter = String(filter);
-            if (this.cacheData_[filter] !== undefined) {
-                this.cacheLength_++;
-            }
-            this.cacheData_[filter] = data;
-            return this.cacheData_[filter];
-        }
-        return false;
-    };
-
-    /**
-     * Flush cache
-     * @public
-     */
-    $.Autocompleter.prototype.cacheFlush = function() {
-        this.cacheData_ = {};
-        this.cacheLength_ = 0;
-    };
-
-    /**
      * Disables the input
      * @public
      */
@@ -964,65 +887,61 @@ ISSUES:
 
         // We want to make sure not to sumbmit any requests where skip=-1
         if (self.numFetched_ === -1) return;
+           
+        var dataType = self.options.remoteDataType === 'json' ? 'json' : 'text';
 
-        var data = this.cacheRead(filter);
-        if (data) {
-            callback(data);
-        } else {
-            
-            var dataType = self.options.remoteDataType === 'json' ? 'json' : 'text';
-            var ajaxCallback = function(data) {
-                var parsed = false;
-                if (data !== false) {
-                    parsed = self.parseRemoteData(data);
-                    self.cacheWrite(filter, parsed);
-                }
-                self.dom.$elem.removeClass(self.options.loadingClass);
-                callback(parsed, fetchNext);
-            };
-            this.dom.$elem.addClass(this.options.loadingClass);
+        // Callback function wrapper & parsing
+        var ajaxCallback = function(data) {
+            var parsed = false;
+            if (data !== false) {
+                parsed = self.parseRemoteData(data);
+            }
+            self.dom.$elem.removeClass(self.options.loadingClass);
+            callback(parsed, fetchNext);
+        };
+        this.dom.$elem.addClass(this.options.loadingClass);
 
             // Figure out limits
-            if (fetchNext) {
-                limit = this.options.numLoadSubsequent;
-                skip = this.numFetched_;
-            } 
-            
-            var urlData = this.options.onBuildUrl(filter, skip, limit);
+        if (fetchNext) {
+            limit = this.options.numLoadSubsequent;
+            skip = this.numFetched_;
+        }
+
+        var urlData = this.options.onBuildUrl(filter, skip, limit);
             
             // Cancel previous request (only if its different than current request)
-            if (this.fetchRemoteRequest_) {
-                if (!(deepObjectCompare(urlData,this.fetchRemoteRequestData_))) {
-                    this.fetchRemoteRequest_.abort();
-                    this.fetchRemoteRequest_ = null;
-                } else {
-                    return;
-                }
+        if (this.fetchRemoteRequest_) {
+            if (!(deepObjectCompare(urlData, this.fetchRemoteRequestData_))) {
+                this.fetchRemoteRequest_.abort();
+                this.fetchRemoteRequest_ = null;
+            } else {
+                return;
             }
-
-            this.fetchRemoteRequestData_ = urlData;
-            this.fetchRemoteRequest_ = $.ajax({
-                url: urlData.url,
-                method: urlData.method || "GET",
-                data: urlData.params,
-                success: ajaxCallback,
-                error: function (jqXHR, textStatus, errorThrown) {
-                    if($.isFunction(self.options.onError)) {
-                        self.options.onError(jqXHR, textStatus, errorThrown);
-                    } else {
-                        if (textStatus !== "abort") // null here means it was aborted and no new request has been issued
-                        {
-                            ajaxCallback(false);
-                        }
-                    }
-                },
-                complete: function() {
-                    self.fetchRemoteRequest_ = null;
-                    self.fetchRemoteRequestUrl_ = null;
-                },
-                dataType: dataType
-            });
         }
+
+        this.fetchRemoteRequestData_ = urlData;
+        this.fetchRemoteRequest_ = $.ajax({
+            url: urlData.url,
+            method: urlData.method || "GET",
+            data: urlData.params,
+            success: ajaxCallback,
+            error: function(jqXHR, textStatus, errorThrown) {
+                if ($.isFunction(self.options.onError)) {
+                    self.options.onError(jqXHR, textStatus, errorThrown);
+                } else {
+                    if (textStatus !== "abort") // null here means it was aborted and no new request has been issued
+                    {
+                        ajaxCallback(false);
+                    }
+                }
+            },
+            complete: function() {
+                self.fetchRemoteRequest_ = null;
+                self.fetchRemoteRequestUrl_ = null;
+            },
+            dataType: dataType
+        });
+
     };
 
     /**
@@ -1039,7 +958,6 @@ ISSUES:
             }
             if (this.options.extraParams[index] !== value) {
                 this.options.extraParams[index] = value;
-                this.cacheFlush();
                 if (this.showingResults_) {
                     this.lastProcessedValue_ = null;
                     this.activateNow();
@@ -1049,43 +967,7 @@ ISSUES:
 
         return this;
     };
-
-    /**
-     * Build the url for a remote request
-     * If options.queryParamName === false, append query to url instead of using a GET parameter
-     * @param {string} param The value parameter to pass to the backend
-     * @returns {string} The finished url with parameters
-     */
-    /*
-    $.Autocompleter.prototype.makeUrl = function(param, fetchNext) {
-        var self = this;
-        var url = this.options.url;
-        var limitParams = {};
-
-        if (this.options.limitParam) {
-            if (fetchNext) {
-                limitParams[this.options.limitParam] = this.options.numLoadSubsequent;
-                limitParams[this.options.skipParam] = this.numFetched_;
-            } else {
-                limitParams[this.options.limitParam] = this.options.numLoadInitial;
-                limitParams[this.options.skipParam] = 0;
-            }
-        }
-
-        this.options.onBuildUrl(param,)
     
-        var params = $.extend({}, this.options.extraParams, limitParams);
-
-        if (this.options.queryParamName === false) {
-            url += encodeURIComponent(param);
-        } else {
-            params[this.options.queryParamName] = param;
-        }
-        //this.options.generateUrl(param, )
-
-        return makeUrl(url, params);
-    };*/
-
     /**
      * Parse data received from server
      * @param remoteData Data received from remote server
