@@ -68,8 +68,7 @@ ISSUES:
         matchInside: true,
         mustMatch: false,
         selectFirst: false,
-        selectOnly: false,
-        showResult: null,
+        selectOnly: false,        
         preventDefaultReturn: 1,
         preventDefaultTab: 0,
         autoFill: false,
@@ -90,7 +89,8 @@ ISSUES:
         onError: null,
         numLoadInitial: 10,
         numLoadSubsequent: 100,
-        onBuildUrl: function(query, skip, limit) {}
+        onBuildUrl: function (query, skip, limit) { },
+        onBuildItem: function($li, value, data) {}
     };
 
     /**
@@ -175,30 +175,6 @@ ISSUES:
             num = stdValue;
         }
         return num;
-    };
-
-    /**
-     * Create partial url for a name/value pair
-     */
-    var makeUrlParam = function(name, value) {
-        return [name, encodeURIComponent(value)].join('=');
-    };
-
-    /**
-     * Build an url
-     * @param {string} url Base url
-     * @param {object} [params] Dictionary of parameters
-     */
-    var makeUrl = function(url, params) {
-        var urlAppend = [];
-        $.each(params, function(index, value) {
-            urlAppend.push(makeUrlParam(index, value));
-        });
-        if (urlAppend.length) {
-            url += url.indexOf('?') === -1 ? '?' : '&';
-            url += urlAppend.join('&');
-        }
-        return url;
     };
 
     /**
@@ -1277,7 +1253,8 @@ ISSUES:
     $.Autocompleter.prototype.createItemFromResult = function(result) {
         var self = this;
         var $li = $('<li/>');
-        $li.html(this.showResult(result.value, result.data));
+        self.options.onBuildItem($li, result.value, result.data);
+        //$li.html(this.showResult(result.value, result.data));
         $li.data({value: result.value, data: result.data})
             .click(function() {
                 self.selectItem($li);
@@ -1410,13 +1387,6 @@ ISSUES:
         return $li;
     };
 
-    $.Autocompleter.prototype.showResult = function(value, data) {
-        if ($.isFunction(this.options.showResult)) {
-            return this.options.showResult(value, data);
-        } else {
-            return $('<p></p>').text(value).html();
-        }
-    };
 
     $.Autocompleter.prototype.autoFill = function (value, filter) {
         var lcValue, lcFilter, filterLength;
