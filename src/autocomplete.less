@@ -108,7 +108,8 @@
     background-color: @variables-LTgray;
     z-index: 999; /* Top */
     /* Allow list to be scrollable 	*/
-    overflow: hidden;
+    //overflow: hidden;
+    position: relative;
 
     ul {
         margin: 0px;
@@ -139,41 +140,6 @@
             &.acNoSelect {
                 cursor: default;
             }
-        }
-    }
-}
-
-.acResultsFloat {
-    white-space: normal;
-    /*padding: 15px 15px;*/
-    background-color: @variables-DKgray;
-    padding-bottom: 5px;
-    font-size: 13/16em;
-    text-transform: uppercase;
-    font-family: Arial, 'DejaVu Sans', 'Liberation Sans', Freesans, sans-serif;
-
-    .acFilterOption {
-        text-decoration: none;
-        color: #FFF;
-        cursor: pointer;
-        margin: 0;
-        padding: 2px 10px 1px;
-        display: block;
-
-        &:hover {
-            text-decoration:underline;
-        }
-    }
-
-    .acFilterOptionSelected {
-        cursor: default;
-        color: #FFF;
-        text-decoration: none;
-        //font-weight: bold;
-        background: @acSelectedFilterBackgroundColor;
-
-        &:hover {
-            text-decoration:none;
         }
     }
 }

@@ -88,7 +88,8 @@ ISSUES:
         numLoadInitial: 10,
         numLoadSubsequent: 100,
         onBuildUrl: function (query, skip, limit) { },
-        onBuildItem: function($li, value, data) {}
+        onBuildItem: function ($li, value, data) { },
+        onListCreate: function($div,$ul) {}
     };
 
     /**
@@ -385,7 +386,8 @@ ISSUES:
         $elem.parent().parent().parent().append(this.dom.$results);
 
         this.dom.$list = $('<ul></ul>');
-        this.dom.$results.append(this.dom.$list);
+        this.options.onListCreate(this.dom.$results, this.dom.$list);
+        //this.dom.$results.append(this.dom.$list);
 
         /**
          * Attach keyboard monitoring to $elem
@@ -950,19 +952,10 @@ ISSUES:
      * @param {string} value Parameter value
      * @public
      */
-    $.Autocompleter.prototype.setExtraParam = function (name, value) {
-        var index = $.trim(String(name));
-        if (index) {
-            if (!this.options.extraParams) {
-                this.options.extraParams = {};
-            }
-            if (this.options.extraParams[index] !== value) {
-                this.options.extraParams[index] = value;
-                if (this.showingResults_) {
-                    this.lastProcessedValue_ = null;
-                    this.activateNow();
-                }
-            }
+    $.Autocompleter.prototype.query = function (name, value) {
+        if (this.showingResults_) {
+            this.lastProcessedValue_ = null;
+            this.activateNow();
         }
 
         return this;
