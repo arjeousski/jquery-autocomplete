@@ -80,6 +80,7 @@ ISSUES:
         matchStringConverter: null,
         beforeUseConverter: null,
         autoWidth: 'min-width',
+        autoWidthModifier: null,
         useDelimiter: false,
         delimiterChar: ',',
         delimiterKeyCode: 188,
@@ -89,7 +90,8 @@ ISSUES:
         numLoadSubsequent: 100,
         onBuildUrl: function (query, skip, limit) { },
         onBuildItem: function ($li, value, data) { },
-        onListCreate: function($div,$ul) {}
+        onListCreate: function ($div, $ul) { },
+        onOpen: function($results, $box) {}
     };
 
     /**
@@ -647,6 +649,11 @@ ISSUES:
     };
     
   
+    $.Autocompleter.prototype.setColor = function (colorObject) {
+        this.dom.$results.css('background-color', colorObject.primary);
+        this.dom.$results.css('border-color', colorObject.primary);
+
+    }
 
     /**
      * Set timeout to activate autocompleter
@@ -680,7 +687,7 @@ ISSUES:
         var value = this.beforeUseConverter(this.dom.$elem.val());
         if ((value !== this.lastProcessedValue_) || (this.lastKeyPressed_ === 46 || this.lastKeyPressed_ === 8)) {
             this.fetchData(value);
-        }
+        }       
     };
 
 
@@ -703,7 +710,10 @@ ISSUES:
         var offset = this.dom.$box.position();
         var height = this.dom.$results.outerHeight();
         var totalHeight = $(window).outerHeight();
+        var totalWidth = $(window).innerWidth();
+
         var inputBottom = offset.top + this.dom.$box.outerHeight();
+
         var bottomIfDown = inputBottom + height;
         // Set autocomplete results at the bottom of input
         var position = {top: inputBottom, left: offset.left};
@@ -717,7 +727,11 @@ ISSUES:
         this.dom.$results.css(position);
 
         if (this.options.autoWidth) {
-            var autoWidth = this.dom.$box.outerWidth() - this.dom.$results.outerWidth() + this.dom.$results.width();
+            var autoWidth = this.dom.$box.outerWidth() - this.dom.$results.outerWidth() + this.dom.$results.width() + (this.options.autoWidthModifier || 0);
+
+            if (offset.left + autoWidth > totalWidth) {
+                autoWidth = totalWidth - offset.left*2;
+            }
             //this.dom.$results.css(this.options.autoWidth, autoWidth);
             $('>ul', this.dom.$results).css(this.options.autoWidth, autoWidth); // AR - IE7 - set correct width on the list too otherwise scrollbar is in the middle of div
          }
@@ -1196,6 +1210,8 @@ ISSUES:
         // Always recalculate position since window size or
         // input element location may have changed.
         this.position();
+
+        this.options.onOpen(this.dom.$results, this.dom.$box);
                 
         var items = this.getItems();
             
