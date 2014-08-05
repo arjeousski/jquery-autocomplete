@@ -1,29 +1,4 @@
-﻿/*@import-once "mixins.less";*/
-.background-image1x(@fileName) {
-    background-image: url('@{fileName}');
-}
-
-/* Disallow selection*/
-.noselect() {
-	-webkit-touch-callout: none;
-    -webkit-user-select: none;
-    -khtml-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-}
-
-
-@acHoverBoxColor: #fff;
-@textColor: black;
-@variables-DKgray: #eee;
-@variables-MDgray: #ddd;
-@variables-LTgray: #ddd;
-@fontFamily: arial;
-@acSelectedFilterBackgroundColor: black;
-/*@import-once "variables.less";*/
-
-.acWrapper {    
+﻿.acWrapper {    
     height: 1em;
     padding: 5px;
     border: 1px solid #FFF;
@@ -33,12 +8,6 @@
     width: 200px;
     min-width: 180px;
     position: relative;
-	.noselect;
-    /*border: 1px solid lighten(@acHoverBoxColor,40%);*/
-
-	&:hover, &.acActive {
-		  border: 1px solid @acHoverBoxColor;
-	}
 
     .inputWrap {
         margin-right: 1em;
@@ -82,8 +51,7 @@
     margin: 0px;    
     padding: 0px;
     outline: none;
-    border: 0px;
-    color: @textColor;
+    border: 0px;    
     background-color: transparent;
     z-index: 2;
     position:absolute;
@@ -117,7 +85,7 @@
         overflow: auto;
         overflow-x: hidden;
         position: relative;
-        .noselect;
+        
 
         li {
             margin: 0px;
@@ -141,8 +109,7 @@
     }
     }
 
-    .acLoading {
-        .background-image1x("indicator.gif");
+    .acLoading {        
         background-position: right center;
         background-repeat: no-repeat;
     }

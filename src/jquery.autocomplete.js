@@ -486,7 +486,9 @@ ISSUES:
                     break;
 
                 default:
+                   
                     self.activate();
+                    if (self.lastSelectedValue_ == null) return false; // If the dropdown isn't open, suppress the event
 
             }
             return true;
