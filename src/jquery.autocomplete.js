@@ -311,8 +311,7 @@ ISSUES:
          * @private
          */
         this.fetchRemoteRequest_ = null;
-        this.fetchRemoteRequestUrl_ = null;
-        
+        this.fetchRemoteRequestUrl_ = null;        
 
         /**
          * @property {int} number of records fetched so far
@@ -324,6 +323,7 @@ ISSUES:
         // This is set to true when we are scrolling so that we ignore hover events (if mouse is over the list)
         this.isScrolling = false;
         this.scrollingTimer = null;
+        this._scrollPosition = -1;
 
         /**
          * Sanitize options
@@ -685,12 +685,35 @@ ISSUES:
     $.Autocompleter.prototype.activateNow = function () {
         var self = this;
         self.dom.$box.addClass("acActive");
-
+       
         var value = this.beforeUseConverter(this.dom.$elem.val());
         if ((value !== this.lastProcessedValue_) || (this.lastKeyPressed_ === 46 || this.lastKeyPressed_ === 8)) {
             this.fetchData(value);
-        }       
+        }
+        
     };
+
+    $.Autocompleter.prototype.preScroll = function () {
+        var self = this;
+
+        setTimeout(function() {
+            var $window = $(window);            
+            if ($window.innerHeight() < 400 && self._scrollPosition === -1) {
+                self._scrollPosition = $(window).scrollTop();
+                $(window).scrollTop(self.dom.$box.offset().top - 10);
+            } else {
+                self._scrollPosition = -1;
+            }
+        },100);
+    }
+
+    $.Autocompleter.prototype.undoScroll = function () {
+        if (this._scrollPosition !== -1) {
+            $(window).scrollTop(this._scrollPosition);
+            this._scrollPosition = -1;
+        }
+    }
+
 
 
     /**
@@ -698,45 +721,76 @@ ISSUES:
      * @private
      */
     $.Autocompleter.prototype.position = function () {
-        var itemsAvailable, $items;
-        
+        var itemsAvailable, $items,
+            $listEl = this.dom.$list,
+            finalHeight;
+
+        this.preScroll();
+
+        // window params
+        var totalHeight = $(window).innerHeight();
+        var totalWidth = $(window).innerWidth();
+        var inputPosition = this.dom.$box.position();
+
+        // Position results box under input box
+        var inputBottom = inputPosition.top + this.dom.$box.outerHeight();        
+        var position = { top: inputBottom, left: inputPosition.left };
+        this.dom.$results.css(position);
+
+        inputPosition = this.dom.$results.offset();
+
+        var inputBottomCurrent = inputPosition.top - $(window).scrollTop();
+
+
 
         // First we need to resize $results to fit desired number of items
         if (this.itemHeight_) {
             $items = this.getItems(true);
             itemsAvailable = $items.length < this.options.maxItemsToShow ? $items.length : this.options.maxItemsToShow;
 
-            this.dom.$list.height(this.itemHeight_ * itemsAvailable);
-        }
+            var idealListHeight = this.itemHeight_ * itemsAvailable;
+            
+            finalHeight = idealListHeight;
 
-        var offset = this.dom.$box.position();
-        var height = this.dom.$results.outerHeight();
-        var totalHeight = $(window).outerHeight();
-        var totalWidth = $(window).innerWidth();
+            // Figure out height of the children without the list
+            var childrenHeight = 0;
 
-        var inputBottom = offset.top + this.dom.$box.outerHeight();
+            this.dom.$results.children().each(function (index, item) {
+                if (!$(item).hasClass("exclude-from-height") && $listEl[0] != item) {
+                    childrenHeight += $(item).outerHeight();
+                }
+            });
 
-        var bottomIfDown = inputBottom + height;
-        // Set autocomplete results at the bottom of input
-        var position = {top: inputBottom, left: offset.left};
-        if (bottomIfDown > totalHeight) {
-            // Try to set autocomplete results at the top of input
-            var topIfUp = offset.top - height;
-            if (topIfUp >= 0) {
-                position.top = topIfUp;
+            if (idealListHeight + childrenHeight > totalHeight - inputBottomCurrent) {
+
+                var availableHeight = totalHeight - inputBottomCurrent - childrenHeight;
+                finalHeight = (Math.max(3,Math.floor(availableHeight / this.itemHeight_))+0.4) * this.itemHeight_; // Min 3
+
             }
+            this.dom.$list.height(finalHeight);
+            
         }
-        this.dom.$results.css(position);
+
+        
+        var height = this.dom.$results.outerHeight();
+        
+
+       
+
 
         if (this.options.autoWidth) {
-            var autoWidth = this.dom.$box.outerWidth() - this.dom.$results.outerWidth() + this.dom.$results.width() + (this.options.autoWidthModifier || 0);
+            var autoWidth = this.dom.$box.outerWidth() - (this.dom.$results.outerWidth() - this.dom.$results.width()) + (this.options.autoWidthModifier || 0);
 
-            if (offset.left + autoWidth > totalWidth) {
-                autoWidth = totalWidth - offset.left*2;
+            if (inputPosition.left + autoWidth > totalWidth) {
+                autoWidth = totalWidth - inputPosition.left*2;
             }
-            //this.dom.$results.css(this.options.autoWidth, autoWidth);
+            this.dom.$results.css(this.options.autoWidth, autoWidth);
             $('>ul', this.dom.$results).css(this.options.autoWidth, autoWidth); // AR - IE7 - set correct width on the list too otherwise scrollbar is in the middle of div
-         }
+        }
+
+
+        this.options.onOpen(this.dom.$results, this.dom.$box, 0, finalHeight);
+        
     };
 
     /**
@@ -939,7 +993,7 @@ ISSUES:
     $.Autocompleter.prototype.query = function (name, value) {
         if (this.showingResults_) {
             this.lastProcessedValue_ = null;
-            this.activateNow();
+            this.activateNow();            
         }
 
         return this;
@@ -1211,10 +1265,16 @@ ISSUES:
 
         // Always recalculate position since window size or
         // input element location may have changed.
-        this.position();
 
-        this.options.onOpen(this.dom.$results, this.dom.$box);
-                
+        if (!append) {
+            
+        }
+
+        if (!this.showingResults_) {
+            // This will only be called on the first iteration
+            this.position();
+        }
+
         var items = this.getItems();
             
         // unbind events from existing items
@@ -1462,12 +1522,15 @@ ISSUES:
         
         this.setAcValue('');
         this.hideResults();
+
         this.dom.$box.removeClass("acActive");
         
         // blur
         //if (!skipBlur) 
         // Leave the field
         this.dom.$elem.blur();
+
+        this.undoScroll();
     };
 
     $.Autocompleter.prototype.selectRange = function(start, end) {
