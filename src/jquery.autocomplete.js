@@ -365,7 +365,7 @@ ISSUES:
         this.dom.$box = this.dom.$elem.parent().parent();
 
         // Append Arrow
-        this.dom.$arrow = $('<div class="arrow"></div>');
+        this.dom.$arrow = $('<div class="arrow"><span></span></div>');
         this.dom.$box.append(this.dom.$arrow);
         
         // Append autocomplete input
