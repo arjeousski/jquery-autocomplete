@@ -1,0 +1,122 @@
+﻿/*@import-once "mixins.less";*/
+/* Disallow selection*/
+/*@import-once "variables.less";*/
+.acWrapper {
+  height: 1em;
+  padding: 5px;
+  border: 1px solid #FFF;
+  cursor: text;
+  background-color: white;
+  vertical-align: middle;
+  width: 200px;
+  min-width: 180px;
+  position: relative;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  /*border: 1px solid lighten(@acHoverBoxColor,40%);*/
+}
+.acWrapper:hover,
+.acWrapper.acActive {
+  border: 1px solid #ffffff;
+}
+.acWrapper .inputWrap {
+  margin-right: 1em;
+  position: relative;
+}
+.acWrapper .arrow {
+  width: 1em;
+  height: 1em;
+  background: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAkAAAAOAQMAAADHWqTrAAAAA3NCSVQICAjb4U/gAAAABlBMVEX///8yXJnt8Ns4AAAACXBIWXMAAAsSAAALEgHS3X78AAAAHHRFWHRTb2Z0d2FyZQBBZG9iZSBGaXJld29ya3MgQ1MzmNZGAwAAABpJREFUCJljYEAF/xsY6hkY7BgYZBgYOFBkADkdAmFDagYFAAAAAElFTkSuQmCC") 50% 50% no-repeat;
+  right: 0;
+  top: 0;
+  position: absolute;
+  z-index: 3;
+  cursor: pointer;
+  padding: 5px;
+}
+.acDisabled,
+.acDisabled:hover {
+  cursor: inherit;
+  border: 1px solid transparent;
+  background-color: transparent;
+}
+.acDisabled .inputWrap,
+.acDisabled:hover .inputWrap {
+  margin-right: 0em;
+}
+.acDisabled .inputWrap .disabledText,
+.acDisabled:hover .inputWrap .disabledText {
+  overflow: hidden;
+  white-space: nowrap;
+}
+.acInput {
+  margin: 0px;
+  padding: 0px;
+  outline: none;
+  border: 0px;
+  color: #000000;
+  background-color: transparent;
+  z-index: 2;
+  position: absolute;
+  width: 100%;
+  height: auto;
+  font-size: .9375em;
+}
+.acInput-back {
+  color: #CCC;
+  position: absolute;
+  z-index: 1;
+}
+.acResults {
+  top: 0px;
+  padding: 0px;
+  z-index: 999;
+  /* Top */
+  /* Allow list to be scrollable 	*/
+  /*overflow: hidden;*/
+  position: relative;
+}
+.acResults ul {
+  margin: 0px;
+  padding: 0px;
+  list-style-position: outside;
+  list-style: none;
+  display: block;
+  line-height: 20px;
+  /* Allow list to be scrollable 	*/
+  overflow: auto;
+  overflow-x: hidden;
+  position: relative;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+.acResults ul li {
+  margin: 0px;
+  padding: 2px 5px;
+  cursor: pointer;
+  display: block;
+  overflow: hidden;
+  text-wrap: none;
+  white-space: nowrap;
+  position: relative;
+}
+.acResults ul li.acSelect {
+  background-color: Highlight;
+  color: HighlightText;
+}
+.acResults ul li.acNoSelect {
+  cursor: default;
+}
+.acLoading {
+  background-image: url('indicator.gif');
+  background-position: right center;
+  background-repeat: no-repeat;
+}

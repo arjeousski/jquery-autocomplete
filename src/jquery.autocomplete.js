@@ -121,7 +121,7 @@ ISSUES:
             if (typeof (x[p]) !== "object") return false;
             // Numbers, Strings, Functions, Booleans must be strictly equal
 
-            if (!Object.equals(x[p], y[p])) return false;
+            if (!deepObjectCompare(x[p], y[p])) return false;
             // Objects and Arrays must be tested recursively
         }
 
@@ -767,7 +767,8 @@ ISSUES:
                 finalHeight = (Math.max(3,Math.floor(availableHeight / this.itemHeight_))+0.4) * this.itemHeight_; // Min 3
 
             }
-            this.dom.$list.height(finalHeight);
+            
+            this.dom.$list.css('max-height',finalHeight);
             
         }
 
