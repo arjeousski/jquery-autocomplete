@@ -746,7 +746,7 @@ ISSUES:
         // First we need to resize $results to fit desired number of items
         if (this.itemHeight_) {
             $items = this.getItems(true);
-            itemsAvailable = $items.length < this.options.maxItemsToShow ? $items.length : this.options.maxItemsToShow;
+            itemsAvailable = this.options.maxItemsToShow;
 
             var idealListHeight = this.itemHeight_ * itemsAvailable;
             
