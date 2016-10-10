@@ -567,6 +567,8 @@ ISSUES:
             }
         };
 
+        // Taken from:
+        // http://stackoverflow.com/questions/5802467/prevent-scrolling-of-parent-element
         var scrollFreezeFunction = function(ev) {
             var $this = $(this),
                 scrollTop = this.scrollTop,
@@ -908,9 +910,12 @@ ISSUES:
             processResults([], value);
         } else if (this.options.data) {
             processResults(this.options.data, value);
-        } else {
+        } else {            
             this.fetchRemoteData(value, fetchNext, function (remoteData, append) {
-                processResults(remoteData, value, append);
+                // If the value we started to fetch the data with, is different than what we currently have in the input, do not display results
+                if (value === self.getValue()) {
+                    processResults(remoteData, value, append);
+                } 
             });
         }
     };
